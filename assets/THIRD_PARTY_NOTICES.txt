@@ -1,0 +1,46 @@
+THIRD-PARTY NOTICES
+Bundled for local hosting. Retrieved 2026-11-12.
+
+Lora — variable Latin WOFF2, normal and italic, weights 400–700
+Copyright 2011 The Lora Project Authors, with Reserved Font Name "Lora".
+SIL Open Font License 1.1. Full license: fonts/OFL-Lora.txt.
+Project: https://github.com/cyrealtype/Lora-Cyrillic
+Google Fonts metadata: https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&display=swap
+The font binaries are distributed unmodified from Google Fonts.
+Only the Latin subsets are included; other characters use the CSS fallback font.
+
+SmilesDrawer 2.1.7 — pinned browser distribution
+Copyright (c) 2017 GDB / Reymond Research Group.
+MIT License. Full license: vendor/LICENSE-SmilesDrawer.txt.
+Project: https://github.com/reymond-group/smilesDrawer
+Package metadata: https://cdn.jsdelivr.net/npm/smiles-drawer@2.1.7/package.json
+The bundled distribution is unmodified. Its embedded chroma.js / ColorBrewer
+license notices are retained in the JavaScript and copied to
+vendor/LICENSE-Chroma-ColorBrewer.txt.
+
+SOURCE FILES AND SHA-256 CHECKSUMS
+
+fonts/lora-latin-normal.woff2
+Source: https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuMwr7Iw.woff2
+Size: 37788 bytes
+SHA-256: ddb8c66035104e233fc024669183aad3738b6daa16deee2ebb1241bd0f98ace1
+
+fonts/lora-latin-italic.woff2
+Source: https://fonts.gstatic.com/s/lora/v37/0QIhMX1D_JOuMw_LIftL.woff2
+Size: 40772 bytes
+SHA-256: d824d807d4d832d12c87932d0b8ec1314dcfd502157a56dee6bb04cf8a3768ae
+
+fonts/OFL-Lora.txt
+Source: https://raw.githubusercontent.com/google/fonts/main/ofl/lora/OFL.txt
+Size: 4423 bytes
+SHA-256: 1d9a970809ac804b582a6ce7f0ebc4e7fefcbfd7ff6299cad35ee656a21be716
+
+vendor/smiles-drawer-2.1.7.min.js
+Source: https://cdn.jsdelivr.net/npm/smiles-drawer@2.1.7/dist/smiles-drawer.min.js
+Size: 252114 bytes
+SHA-256: 955285fac52a7017b3c3658e2cb84bef7f1f76732f3f7cd565d1bb0903232dc2
+
+vendor/LICENSE-SmilesDrawer.txt
+Source: https://cdn.jsdelivr.net/npm/smiles-drawer@2.1.7/LICENSE.md
+Size: 1106 bytes
+SHA-256: 919c7fa7363867d5785a1362aeb1df8ffa62f976db7f963fd57c397c2cbadeb4

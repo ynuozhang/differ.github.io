@@ -1,0 +1,2283 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Differ — enzyme chemistry, in motion</title>
+<meta name="description" content="Explore enzyme chemistry through illustrated reaction mechanisms, step by step. An interactive preview of Differ, with substrate SMILES, product structures and animated electron-pair arrows.">
+<meta name="theme-color" content="#321c17">
+<meta property="og:title" content="Differ — enzyme chemistry, in motion">
+<meta property="og:description" content="From substrate to product, follow the chemistry. An interactive mechanism explorer; prediction model in development.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+<link rel="preload" href="./assets/fonts/lora-latin-normal.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:"Lora";font-style:normal;font-weight:400 700;font-display:swap;src:url("./assets/fonts/lora-latin-normal.woff2") format("woff2");}
+@font-face{font-family:"Lora";font-style:italic;font-weight:400 700;font-display:swap;src:url("./assets/fonts/lora-latin-italic.woff2") format("woff2");}
+:root{
+  color-scheme: dark;
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  --font: "Lora", Georgia, "Times New Roman", serif;
+  --mono: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --bg: #321C17;
+  --surface: #43251E;
+  --surface-2: #512D22;
+  --ink: #F8E5C9;
+  --ink-2: #DAB897;
+  --line: #79503D;
+  --accent: #E9B46E;
+  --accent-ink: #301A14;
+  --gold: #E9BB79;
+  --mol-c: #F8E5C9;
+  --mol-o: #F0A18A;
+  --mol-n: #EBCB7A;
+  --mol-h: #DAB897;
+  --st-bg: #2B1815;
+  --st-bg-2: #633826;
+  --st-ink: #F8E5C9;
+  --st-ink-2: #DFBB98;
+  --st-amber: #F1BC6B;
+  --st-ochre: #E3AE69;
+  --st-glass: rgba(43, 24, 21, .94);
+  --g-sub: #FFF0D1;
+  --g-enz: #F0A18A;
+  --g-cof: #E5C16B;
+  --g-wat: #E7BEA7;
+}
+*, *::before, *::after{ box-sizing: inherit; }
+html{ scroll-padding-top: env(safe-area-inset-top, 0px); background: var(--bg); }
+body{ margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 1.0625rem; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+body::before{ content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 60; background: var(--st-bg); transition: background .4s; }
+html.past-stage body::before{ background: var(--bg); }
+svg{ max-width: 100%; }
+a{ color: var(--accent); }
+:focus-visible{ outline: 2px solid var(--st-amber); outline-offset: 3px; border-radius: 8px; }
+.section :focus-visible{ outline-color: var(--accent); }
+.defs{ position: absolute; width: 0; height: 0; overflow: hidden; }
+
+/* Navigation */
+.nav{ position: fixed; top: 0; left: 0; right: 0; z-index: 50; padding: calc(env(safe-area-inset-top, 0px) + 14px) clamp(16px, 4vw, 48px) 14px; display: flex; align-items: center; gap: 28px; color: var(--st-ink); transition: background .35s, color .35s, border-color .35s; border-bottom: 1px solid transparent; }
+.nav.on-page{ background: color-mix(in srgb, var(--bg) 88%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: var(--ink); border-bottom-color: var(--line); }
+.brand{ display: flex; align-items: center; gap: 10px; font-weight: 500; font-size: 1.2rem; color: inherit; text-decoration: none; }
+.brand svg{ width: 24px; height: 24px; }
+.nav-links{ display: flex; gap: 26px; margin-left: auto; }
+.nav-links a{ color: inherit; text-decoration: none; font-size: .95rem; opacity: .78; padding: 10px 0; }
+.nav-links a:hover{ opacity: 1; }
+.status{ display: inline-flex; align-items: center; gap: 9px; font-size: .85rem; padding: 7px 14px; border-radius: 999px; border: 1px solid color-mix(in srgb, currentColor 40%, transparent); }
+.status i{ width: 8px; height: 8px; border-radius: 50%; background: var(--st-amber); animation: beat 2.4s ease-in-out infinite; }
+@keyframes beat{ 0%,100%{ box-shadow: 0 0 0 0 rgba(255,178,56,.55); } 50%{ box-shadow: 0 0 0 6px rgba(255,178,56,0); } }
+@media (max-width: 760px){ .nav-links{ display: none; } .status{ margin-left: auto; } }
+
+/* Story stage */
+.story{ position: relative; height: 900vh; background: var(--st-bg); }
+.stage{
+  position: sticky; top: env(safe-area-inset-top, 0px); height: 100vh; height: 100svh; overflow: hidden; color: var(--st-ink);
+  background: radial-gradient(110% 85% at 64% 52%, var(--st-bg-2) 0%, #47271E 38%, var(--st-bg) 72%);
+  cursor: grab; touch-action: pan-y; -webkit-user-select: none; user-select: none;
+}
+.stage.dragging{ cursor: grabbing; }
+.stage.zoomed{ cursor: default; }
+#cloud, #stageSvg{ position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#stageSvg{ pointer-events: none; }
+.intro{ position: absolute; z-index: 3; left: clamp(20px, 6vw, 104px); top: 50%; transform: translateY(-50%); max-width: min(35rem, 40vw); cursor: auto; }
+.intro h1{ font-weight: 300; font-size: clamp(2.5rem, 1.6rem + 3.3vw, 4.7rem); line-height: 1.02; letter-spacing: -.028em; margin: 0 0 .42em; }
+.intro p{ color: var(--st-ink-2); font-size: 1.16rem; margin: 0 0 1.7em; max-width: 29rem; -webkit-user-select: text; user-select: text; }
+.actions{ display: flex; flex-wrap: wrap; gap: 12px; }
+.btn{ font: inherit; font-weight: 500; font-size: 1rem; line-height: 1.2; border-radius: 999px; padding: .85em 1.45em; min-height: 46px; border: 1px solid transparent; cursor: pointer; display: inline-flex; align-items: center; gap: .55em; text-decoration: none; transition: transform .2s ease, background .2s, box-shadow .3s; }
+.btn:active{ transform: translateY(1px); }
+.stage .btn.primary, .section .player .btn.primary{ background: var(--st-amber); color: #2B1815; align-self: auto; }
+.stage .btn.primary:hover, .player .btn.primary:hover{ box-shadow: 0 0 28px rgba(255,178,56,.45); }
+.stage .btn.ghost{ background: transparent; color: var(--st-ink); border-color: rgba(246,231,205,.38); }
+.stage .btn.ghost:hover{ border-color: var(--st-ink); }
+.hint{ white-space: nowrap; position: absolute; z-index: 3; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: .9rem; color: var(--st-ink-2); pointer-events: none; }
+.hint span{ width: 1px; height: 40px; background: linear-gradient(var(--st-amber), transparent); animation: drip 2.2s ease-in-out infinite; transform-origin: top; }
+@keyframes drip{ 0%{ transform: scaleY(0); opacity: 1; } 70%{ transform: scaleY(1); opacity: 1; } 100%{ transform: scaleY(1); opacity: 0; } }
+.tip{ position: absolute; z-index: 5; pointer-events: none; padding: 10px 14px; border-radius: 14px; background: var(--st-glass); border: 1px solid rgba(232,176,75,.4); color: var(--st-ink); font-size: .88rem; line-height: 1.4; max-width: 16rem; opacity: 0; transform: translate(16px, 16px); transition: opacity .25s; -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.tip b{ font-weight: 500; color: var(--st-amber); display: block; }
+.key{ position: absolute; z-index: 3; right: clamp(16px, 3vw, 40px); bottom: calc(22px + env(safe-area-inset-bottom, 0px)); display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: flex-end; font-size: .84rem; color: var(--st-ink-2); pointer-events: none; max-width: 46vw; }
+.key span{ display: inline-flex; align-items: center; gap: 7px; }
+.key i{ width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.key .k-sub{ background: var(--g-sub); } .key .k-enz{ background: var(--g-enz); } .key .k-cof{ background: var(--g-cof); } .key .k-wat{ background: var(--g-wat); }
+
+.panel{ position: absolute; z-index: 3; left: clamp(20px, 5vw, 84px); top: 50%; transform: translateY(-50%); width: min(25.5rem, 30vw); opacity: 0; visibility: hidden; transition: opacity .45s, visibility .45s; cursor: auto; }
+.panel.show{ opacity: 1; visibility: visible; }
+.panel-inner{ transition: opacity .22s ease, transform .22s ease; }
+.panel-inner.swap{ opacity: 0; transform: translateY(6px); }
+.panel .count{ font-size: .92rem; color: var(--st-ochre); }
+.panel h2{ font-weight: 400; font-size: clamp(1.65rem, 1.1rem + 1.25vw, 2.35rem); line-height: 1.1; letter-spacing: -.012em; margin: .18em 0 .5em; }
+.panel p{ color: var(--st-ink-2); margin: 0 0 1.1em; font-size: 1rem; }
+.panel .eq{ font-size: 1.08rem; color: var(--st-ink); margin: 0 0 .9em; }
+.legend{ list-style: none; padding: 0; margin: 0; display: grid; gap: .6em; }
+.legend li{ display: grid; grid-template-columns: 1.7em 1fr; gap: .65em; align-items: start; font-size: .95rem; line-height: 1.45; color: var(--st-ink-2); transition: color .3s; }
+.legend li b{ width: 1.55em; height: 1.55em; border-radius: 50%; border: 1px solid var(--st-amber); color: var(--st-amber); display: grid; place-items: center; font-size: .76rem; font-weight: 500; margin-top: .05em; transition: background .3s, color .3s, box-shadow .3s; }
+.legend li.on{ color: var(--st-ink); }
+.legend li.on b{ background: var(--st-amber); color: #2B1815; box-shadow: 0 0 14px rgba(255,178,56,.6); }
+.panel .btn{ margin-top: .4em; }
+
+.rail{ position: absolute; z-index: 4; right: clamp(10px, 2vw, 32px); top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 2px; opacity: 0; visibility: hidden; transition: opacity .4s, visibility .4s; }
+.rail.show{ opacity: 1; visibility: visible; }
+.rail button{ font: inherit; background: none; border: 0; cursor: pointer; color: var(--st-ink-2); display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-height: 44px; padding: 0 6px; font-size: .86rem; }
+.rail button span{ opacity: 0; transform: translateX(4px); transition: opacity .25s, transform .25s; white-space: nowrap; }
+.rail button i{ width: 11px; height: 11px; border-radius: 50%; border: 1.5px solid var(--st-ochre); transition: background .3s, box-shadow .3s, transform .3s; }
+.rail button:hover span, .rail button:focus-visible span, .rail button[aria-current="step"] span{ opacity: 1; transform: none; }
+.rail button[aria-current="step"]{ color: var(--st-ink); }
+.rail button[aria-current="step"] i{ background: var(--st-amber); border-color: var(--st-amber); box-shadow: 0 0 14px var(--st-amber); transform: scale(1.15); }
+
+@media (max-width: 860px){
+  .intro{ top: calc(84px + 2vh); transform: none; right: 20px; max-width: none; }
+  .intro h1{ font-size: clamp(2.2rem, 1.4rem + 4vw, 3.2rem); }
+  .intro p{ font-size: 1.02rem; margin-bottom: 1.2em; }
+  .panel{ left: 12px; right: 12px; top: auto; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); transform: none; width: auto; background: var(--st-glass); border: 1px solid rgba(232,176,75,.22); border-radius: 20px; padding: 16px 18px; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); max-height: 40svh; overflow-y: auto; }
+  .panel h2{ font-size: 1.35rem; margin-bottom: .35em; }
+  .panel p{ font-size: .93rem; margin-bottom: .7em; }
+  .panel p.desc{ display: none; }
+  .legend{ gap: .4em; }
+  .legend li{ font-size: .86rem; }
+  .rail{ top: calc(64px + env(safe-area-inset-top, 0px)); right: 50%; transform: translateX(50%); flex-direction: row; gap: 0; }
+  .rail button{ padding: 0 7px; }
+  .rail button span{ display: none; }
+  .stage .key{ top: calc(112px + env(safe-area-inset-top, 0px)); bottom: auto; left: 16px; right: 16px; justify-content: center; max-width: none; font-size: .78rem; opacity: 0; transition: opacity .4s; }
+  .stage.deep .key{ opacity: 1; }
+  .stage .chem text.k-O, .stage .chem text.k-N, .stage .chem text.k-R{ font-size: 24px; }
+  .stage .chem text.k-H{ font-size: 20px; }
+  .stage .chem text.k-C, .stage .chem text.k-NH, .stage .chem text.k-L{ font-size: 21px; }
+  .stage .chem text.k-res{ font-size: 18px; }
+  .stage .chem .bond{ stroke-width: 3; }
+  .stage .chem .a-path{ stroke-width: 3.6; }
+}
+
+/* Page sections */
+.section{ padding: clamp(80px, 11vw, 150px) clamp(20px, 5vw, 64px); }
+.wrap{ max-width: 1180px; margin: 0 auto; }
+.sec-head{ max-width: 42rem; margin-bottom: clamp(30px, 4vw, 52px); }
+.sec-head h2{ font-weight: 300; font-size: clamp(2.1rem, 1.4rem + 2.2vw, 3.4rem); line-height: 1.04; letter-spacing: -.022em; margin: 0 0 .4em; }
+.sec-head p{ color: var(--ink-2); margin: 0; font-size: 1.1rem; }
+.predict-grid{ display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: clamp(20px, 3vw, 44px); align-items: stretch; }
+@media (max-width: 880px){ .predict-grid{ grid-template-columns: 1fr; } }
+.input-card{ background: var(--surface); border: 1px solid var(--line); border-radius: 24px; padding: clamp(22px, 3vw, 34px); display: flex; flex-direction: column; }
+.field{ display: flex; flex-direction: column; gap: 8px; margin-bottom: 22px; }
+.field label{ font-weight: 500; font-size: .98rem; }
+.field label small{ font-weight: 400; color: var(--ink-2); font-size: .9rem; margin-left: .4em; }
+.field input{ width: 100%; font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: .8em 1em; min-height: 50px; transition: border-color .2s, box-shadow .2s; }
+.field input:focus{ outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.field input.smiles{ font-family: var(--mono); font-size: 1.18rem; }
+.field input[aria-invalid="true"]{ border-color: var(--accent); }
+.msg{ min-height: 1.4em; margin: 0; font-size: .92rem; color: var(--ink-2); }
+.msg.err{ color: var(--accent); }
+.chips-label{ font-weight: 500; font-size: .98rem; margin: -4px 0 8px; }
+.chips{ display: grid; gap: 8px; margin: 0 0 24px; }
+.chip{ font: inherit; text-align: left; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 16px; padding: .6em 1em; min-height: 52px; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; transition: border-color .2s, background .2s; }
+.chip b{ font-weight: 500; font-size: .98rem; }
+.chip span{ font-size: .86rem; color: var(--ink-2); grid-column: 1; }
+.chip em{ font-style: normal; font-size: .8rem; color: var(--ink-2); grid-row: 1 / span 2; grid-column: 2; }
+.chip:hover{ border-color: var(--accent); }
+.chip[aria-pressed="true"]{ border-color: var(--accent); background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.section .btn.primary{ background: var(--accent); color: var(--accent-ink); align-self: flex-start; }
+.section .btn.primary:hover{ box-shadow: 0 6px 24px color-mix(in srgb, var(--accent) 35%, transparent); }
+.section .btn.primary[disabled]{ opacity: .6; cursor: progress; }
+.plate{ margin: 0; border-radius: 24px; padding: 18px 18px 14px; display: flex; flex-direction: column; min-height: 320px; background-color: var(--surface-2); background-image: radial-gradient(color-mix(in srgb, var(--ink) 16%, transparent) 1px, transparent 1.2px); background-size: 18px 18px; }
+.plate .mol{ flex: 1; display: grid; place-items: center; min-height: 260px; }
+.plate .mol svg{ width: 100%; height: 340px; }
+.products .plate .mol svg{ height: 200px; }
+.plate figcaption{ display: flex; justify-content: space-between; gap: 12px; align-items: baseline; font-size: .92rem; color: var(--ink-2); padding: 8px 4px 0; border-top: 1px solid color-mix(in srgb, var(--ink) 15%, transparent); }
+.plate figcaption b{ font-weight: 500; color: var(--ink); }
+.empty{ color: var(--ink-2); font-size: .95rem; text-align: center; max-width: 18rem; }
+.result{ margin-top: clamp(36px, 5vw, 64px); scroll-margin-top: 96px; }
+.result[hidden]{ display: none; }
+.banner{ display: flex; gap: 12px; align-items: flex-start; padding: 14px 18px; border-radius: 16px; background: color-mix(in srgb, var(--gold) 12%, var(--surface)); border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent); font-size: .97rem; margin-bottom: 26px; color: var(--ink); }
+.banner svg{ flex: none; width: 20px; height: 20px; margin-top: 2px; color: var(--gold); }
+.loading{ display: grid; gap: 12px; padding: 24px 0; margin: 0; }
+.loading[hidden]{ display: none; }
+.loading li{ list-style: none; display: flex; align-items: center; gap: 14px; color: var(--ink-2); }
+.loading li.on, .loading li.done{ color: var(--ink); }
+.loading i{ width: 12px; height: 12px; border-radius: 50%; border: 1.5px solid var(--line); flex: none; }
+.loading li.on i{ border-color: var(--accent); background: var(--accent); animation: beat2 1s ease-in-out infinite; }
+.loading li.done i{ border-color: var(--accent); background: var(--accent); }
+@keyframes beat2{ 0%,100%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--accent) 50%, transparent); } 50%{ box-shadow: 0 0 0 6px transparent; } }
+.result-grid{ display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1.5fr); gap: clamp(20px, 3vw, 40px); align-items: start; }
+@media (max-width: 960px){ .result-grid{ grid-template-columns: minmax(0, 1fr); } }
+.result h3{ font-weight: 400; font-size: 1.45rem; letter-spacing: -.01em; margin: 0 0 14px; }
+.products{ display: grid; gap: 16px; }
+.products .plate{ min-height: 0; }
+.products .plate .mol{ min-height: 180px; }
+.smiles-row{ display: flex; align-items: center; gap: 8px; min-width: 0; }
+.smiles-row code{ font-family: var(--mono); font-size: .95rem; color: var(--ink); overflow-x: auto; white-space: nowrap; min-width: 0; }
+.copy{ font: inherit; font-size: .85rem; background: transparent; border: 1px solid var(--line); color: var(--ink); border-radius: 999px; min-height: 36px; padding: 0 12px; cursor: pointer; flex: none; }
+.copy:hover{ border-color: var(--accent); color: var(--accent); }
+.cofnote{ border: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); border-radius: 18px; padding: 14px 16px; font-size: .95rem; color: var(--ink-2); }
+.cofnote b{ color: var(--ink); font-weight: 500; }
+.player{ border-radius: 28px; color: var(--st-ink); padding: clamp(16px, 2.4vw, 26px); background: radial-gradient(120% 90% at 60% 45%, var(--st-bg-2) 0%, #47271E 45%, var(--st-bg) 85%); }
+.player-top{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+.tabs{ display: flex; flex-wrap: wrap; gap: 6px; }
+.tab, .play{ font: inherit; font-size: .9rem; color: var(--st-ink-2); background: transparent; border: 1px solid rgba(246,231,205,.25); border-radius: 999px; min-height: 44px; padding: 0 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: background .25s, color .25s, border-color .25s; }
+.tab:hover, .play:hover{ color: var(--st-ink); border-color: rgba(246,231,205,.6); }
+.tab[aria-pressed="true"]{ background: var(--st-amber); color: #2B1815; border-color: var(--st-amber); }
+.play svg{ width: 14px; height: 14px; }
+.player svg.mech{ width: 100%; height: auto; max-height: 560px; display: block; margin: 8px 0 4px; }
+.player .key{ position: static; justify-content: flex-start; max-width: none; margin: 4px 0 12px; }
+.player .cap h4{ font-weight: 400; font-size: 1.25rem; margin: 0 0 .3em; }
+.player .cap p{ color: var(--st-ink-2); margin: 0 0 .8em; font-size: .97rem; }
+.player .legend li{ font-size: .92rem; }
+.player-foot{ display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.player .ref{ font-size: .85rem; color: var(--st-ink-2); margin: 0; }
+.status-grid{ display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: clamp(28px, 5vw, 72px); align-items: start; }
+@media (max-width: 880px){ .status-grid{ grid-template-columns: 1fr; } }
+.status-grid p{ color: var(--ink-2); margin: 0 0 1em; max-width: 34rem; }
+.spec{ margin: 0; display: grid; border-top: 1px solid var(--line); }
+.spec div{ display: grid; grid-template-columns: 10rem 1fr; gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+@media (max-width: 560px){ .spec div{ grid-template-columns: 1fr; gap: 4px; } }
+.spec dt{ font-weight: 500; }
+.spec dd{ margin: 0; color: var(--ink-2); }
+footer{ padding: 36px clamp(20px, 5vw, 64px) calc(36px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); color: var(--ink-2); font-size: .9rem; }
+footer .wrap{ display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; }
+
+/* Mechanism drawing */
+.chem text{ font-family: var(--font); font-weight: 500; }
+.chem .k-res{ font-weight: 400; letter-spacing: .02em; }
+.chem .bond{ stroke-linecap: round; stroke-width: 2.5; fill: none; }
+.chem .hb{ stroke-dasharray: 1.5 6; stroke-linecap: round; stroke-width: 2.2; fill: none; stroke: var(--st-ink); stroke-opacity: .55; }
+.chem .bglow{ stroke-linecap: round; stroke-width: 9; fill: none; stroke: var(--st-amber); }
+.chem line.g-sub{ stroke: var(--g-sub); } .chem text.g-sub{ fill: var(--g-sub); }
+.chem line.g-enz{ stroke: var(--g-enz); } .chem text.g-enz{ fill: var(--g-enz); }
+.chem line.g-cof{ stroke: var(--g-cof); } .chem text.g-cof{ fill: var(--g-cof); }
+.chem line.g-wat{ stroke: var(--g-wat); } .chem text.g-wat{ fill: var(--g-wat); }
+.chem text.k-res{ fill-opacity: .82; }
+.chem .a-path{ fill: none; stroke-width: 2.9; stroke-linecap: round; stroke: var(--st-amber); }
+.chem .a-glow{ fill: none; stroke-width: 9; stroke-linecap: round; stroke: var(--st-amber); }
+.chem .a-pulse{ fill: none; stroke-width: 3.4; stroke-linecap: round; stroke: #FFF3D6; }
+.chem .a-head{ fill: var(--st-amber); }
+.chem .lp{ fill: var(--st-amber); }
+.chem .e{ fill: #FFF6DF; }
+.chem .ripple{ fill: none; stroke-width: 1.6; stroke: var(--st-amber); }
+.chem .badge circle{ fill: var(--st-bg); stroke: var(--st-amber); stroke-width: 1.2; }
+.chem .badge text{ font-size: 11px; font-weight: 500; fill: var(--st-amber); }
+.chem .charge circle{ fill: var(--st-bg); stroke-width: 1.3; }
+.chem .charge text{ font-size: 13px; font-weight: 700; }
+.chem .charge.g-sub circle{ stroke: var(--g-sub); } .chem .charge.g-sub text{ fill: var(--g-sub); }
+.chem .charge.g-enz circle{ stroke: var(--g-enz); } .chem .charge.g-enz text{ fill: var(--g-enz); }
+.chem .charge.g-cof circle{ stroke: var(--g-cof); } .chem .charge.g-cof text{ fill: var(--g-cof); }
+.chem .charge.g-wat circle{ stroke: var(--g-wat); } .chem .charge.g-wat text{ fill: var(--g-wat); }
+
+@media (prefers-reduced-motion: reduce){
+  *{ animation: none !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+
+/* One warm palette, from the first scene through the final section. */
+html{scroll-padding-top:0;}
+body{font-size:1rem;line-height:1.7;}
+.skip-link{position:fixed;left:20px;top:-100px;z-index:100;padding:12px 20px;background:var(--surface);color:var(--ink);border-radius:8px;}
+.skip-link:focus{top:12px;}
+.nav{padding-top:calc(env(safe-area-inset-top,0px) + 19px);padding-bottom:18px;border-bottom-color:rgba(245,238,219,.12);}
+.brand{font-size:1.55rem;font-weight:600;letter-spacing:-.045em;gap:9px;}
+.brand svg{width:46px;height:46px;flex:none;}
+.nav-links{gap:30px;}
+.nav-links a{font-size:.86rem;opacity:.86;}
+.status{font-size:.73rem;padding:7px 12px;letter-spacing:.01em;}
+.status i{width:6px;height:6px;background:#EAB566;animation:none;}
+.status-short,.mobile-explore{display:none;}
+.stage{overflow:clip;background:radial-gradient(ellipse 58% 75% at 76% 42%,rgba(185,104,44,.30),transparent 75%),radial-gradient(ellipse 44% 70% at 12% 90%,rgba(136,48,44,.25),transparent 76%),linear-gradient(115deg,#321C17 6%,#3E241B 52%,#4E2C20 100%);}
+.intro{max-width:min(37rem,44vw);top:48%;}
+.eyebrow{font-size:.68rem;letter-spacing:.17em;text-transform:uppercase;font-weight:500;display:flex;align-items:center;gap:12px;margin:0 0 24px;color:var(--st-ochre);}
+.eyebrow::before{content:"";display:inline-block;width:28px;height:1px;background:currentColor;}
+.intro h1{font-weight:400;font-size:clamp(3.1rem,5.45vw,5.6rem);line-height:1.08;letter-spacing:-.065em;margin:0 0 26px;}
+.intro h1 em{font-weight:400;color:#E4C792;letter-spacing:-.055em;}
+.intro p{font-size:1.04rem;line-height:1.8;max-width:29rem;margin-bottom:1.7rem;}
+.intro .hero-note{font-size:.74rem;color:var(--st-ink-2);margin:19px 0 0;opacity:.82;letter-spacing:.01em;}
+.btn{font-weight:500;font-size:.89rem;padding:.95em 1.55em;min-height:48px;}
+.stage .btn.primary{background:#E8C388;color:#301A14;}
+.stage .btn.primary:hover{background:#F1D7A9;box-shadow:0 6px 24px rgba(220,179,108,.17);}
+.stage .btn.ghost{border-color:rgba(238,227,205,.3);}
+.hint{font-size:.74rem;bottom:24px;gap:8px;}
+.hint span{height:28px;}
+.stage-tools{position:absolute;z-index:5;bottom:26px;left:clamp(20px,4vw,56px);display:flex;align-items:center;gap:15px;}
+.motion-button{font:inherit;color:var(--st-ink-2);font-size:.72rem;background:transparent;border:1px solid rgba(239,230,209,.24);border-radius:999px;min-height:40px;padding:0 13px;cursor:pointer;}
+.motion-button:hover{border-color:var(--st-ochre);color:var(--st-ink);}
+.fold-note{font-size:.68rem;color:var(--st-ink-2);opacity:.78;}
+.stage .key{font-size:.73rem;gap:8px 13px;max-width:35vw;bottom:38px;}
+.key i{width:7px;height:7px;}
+.scene-caption{position:absolute;z-index:2;right:clamp(24px,6vw,100px);top:120px;color:var(--st-ink-2);font-size:.73rem;text-align:right;letter-spacing:.025em;pointer-events:none;}
+.scene-caption b{display:block;color:var(--st-ochre);font-weight:400;font-size:.64rem;text-transform:uppercase;letter-spacing:.16em;margin-bottom:5px;}
+.stage.deep .scene-caption{opacity:0;}
+.stage-progress{position:absolute;bottom:0;left:0;height:2px;background:var(--st-amber);width:0;z-index:6;opacity:.7;}
+.panel{width:min(25rem,29vw);}
+.panel h2{font-size:clamp(1.6rem,2.3vw,2.2rem);font-weight:400;line-height:1.2;}
+.panel .count{font-size:.75rem;letter-spacing:.07em;}
+.panel p{font-size:.94rem;line-height:1.7;}
+.legend li{font-size:.84rem;line-height:1.6;}
+.rail button{font-size:.74rem;}
+.rail button i{width:8px;height:8px;}
+.section{padding-top:110px;padding-bottom:110px;scroll-margin-top:0;}
+.section .eyebrow{color:var(--gold);margin-bottom:18px;}
+.sec-head{max-width:46rem;margin-bottom:42px;}
+.sec-head h2{font-weight:400;font-size:clamp(2rem,3.6vw,3.25rem);line-height:1.13;letter-spacing:-.045em;}
+.sec-head h2 em{font-weight:400;color:var(--accent);}
+.sec-head p{font-size:1rem;line-height:1.8;}
+.input-card{border-radius:16px;padding:30px;box-shadow:0 8px 32px rgba(51,51,28,.025);}
+.field label,.chips-label{font-size:.86rem;font-weight:500;}
+.field label small{font-size:.72rem;font-style:italic;}
+.field input{border-radius:8px;min-height:48px;font-size:.93rem;padding:.8em .9em;}
+.field input.smiles{font-size:.94rem;letter-spacing:-.02em;}
+.field input[readonly]{background:var(--surface-2);border-style:dashed;}
+.msg{font-size:.78rem;line-height:1.65;}
+.form-note{font-size:.76rem;color:var(--ink-2);line-height:1.7;margin:13px 0 0;}
+.chip{border-radius:9px;min-height:62px;}
+.chip b{font-size:.91rem;}
+.chip span{font-size:.72rem;line-height:1.5;}
+.chip em{font-size:.68rem;}
+.plate{border-radius:16px;background-image:radial-gradient(color-mix(in srgb,var(--ink) 12%,transparent) .8px,transparent 1px);background-size:21px 21px;}
+.plate figcaption{font-size:.8rem;flex-wrap:wrap;}
+.preview-label{display:flex;justify-content:space-between;align-items:center;padding:6px 8px;font-size:.66rem;letter-spacing:.13em;color:var(--ink-2);text-transform:uppercase;}
+.preview-label span:last-child{font-style:italic;letter-spacing:0;text-transform:none;font-size:.77rem;}
+.smiles-row{max-width:100%;}
+.smiles-row code{font-size:.8rem;}
+.banner{font-size:.85rem;border-radius:10px;background:var(--surface);}
+.pending-mechanism{border:1px dashed var(--line);border-radius:16px;padding:48px 30px;display:grid;align-content:center;min-height:300px;}
+.pending-mechanism h3{font-size:1.65rem;}
+.pending-mechanism p{font-size:.9rem;color:var(--ink-2);max-width:30rem;}
+.pending-mechanism[hidden],.player[hidden]{display:none;}
+.player{border-radius:18px;background:radial-gradient(ellipse at 75% 15%,#603825,transparent 76%),#2B1815;border:1px solid #82523A;}
+.player .tab,.player .play{font-size:.76rem;padding:0 12px;}
+.player .cap h4{font-size:1.16rem;line-height:1.5;}
+.player .cap p,.player .legend li{font-size:.84rem;}
+.player .ref{font-size:.7rem;}
+.player .ref a{color:var(--st-amber);text-underline-offset:4px;}
+.drawing-note{font-size:.68rem;color:var(--st-ink-2);line-height:1.65;margin:12px 0 0;opacity:.85;}
+.step-scrub{display:grid;grid-template-columns:auto 1fr 3ch;gap:12px;align-items:center;padding:10px 0 16px;color:var(--st-ink-2);font-size:.7rem;}
+.step-scrub input{width:100%;min-width:0;accent-color:var(--st-amber);cursor:pointer;min-height:32px;}
+.step-scrub output{font-variant-numeric:tabular-nums;text-align:right;}
+.export-step{font:inherit;font-size:.72rem;min-height:40px;padding:8px 12px;color:var(--st-ink);background:transparent;border:1px solid rgba(239,230,209,.3);border-radius:999px;cursor:pointer;}
+#model{background:color-mix(in srgb,var(--surface-2) 62%,var(--bg));border-top:1px solid var(--line);}
+.spec div{grid-template-columns:7.8rem 1fr;gap:20px;}
+.spec dt{font-size:.86rem;}
+.spec dd{font-size:.88rem;line-height:1.75;}
+.status-intro{font-size:.89rem;color:var(--ink-2);margin-top:0;}
+footer{font-size:.75rem;line-height:1.8;}
+footer .wrap{gap:24px;}
+footer .source-note{max-width:43rem;}
+footer a{color:inherit;text-underline-offset:3px;}
+.motion-paused .hint span{animation-play-state:paused;}
+.noscript{margin:90px 24px 24px;padding:20px;background:var(--surface);border:1px solid var(--line);color:var(--ink);}
+@media (max-width:1100px) and (min-width:861px){.intro h1{font-size:4.1rem;}.fold-note{display:none;}.hint{left:48%;}.stage .key{max-width:34vw;font-size:.64rem;}.intro p{font-size:.96rem;}}
+@media (max-width:860px){
+  .intro{top:calc(100px + env(safe-area-inset-top,0px));max-width:none;right:24px;}
+  .intro h1{font-size:clamp(2.8rem,7vw,4.4rem);margin-bottom:18px;line-height:1.08;}
+  .intro .eyebrow{font-size:.6rem;margin-bottom:17px;}
+  .intro p{font-size:.88rem;line-height:1.7;max-width:32rem;margin-bottom:19px;}
+  .intro .hero-note{font-size:.65rem;margin-top:14px;}
+  .scene-caption{top:auto;bottom:98px;right:20px;font-size:.62rem;}
+  .scene-caption b{font-size:.56rem;}
+  .hint{font-size:.61rem;bottom:74px;gap:4px;}
+  .hint span{height:17px;}
+  .stage-tools{left:16px;bottom:14px;gap:12px;}
+  .motion-button{font-size:.65rem;min-height:36px;}
+  .fold-note{font-size:.58rem;}
+  .stage .key{max-width:none;top:112px;bottom:auto;font-size:.65rem;}
+  .panel{left:12px;right:12px;bottom:62px;width:auto;padding:17px 20px;border-radius:12px;max-height:36svh;}
+  .panel h2{font-size:1.25rem;}
+  .panel .count{font-size:.65rem;}
+  .legend li{font-size:.74rem;}
+  .rail{top:70px;}
+  .section{padding-top:76px;padding-bottom:76px;}
+}
+@media (max-width:600px){
+  .nav{gap:16px;padding:14px 18px;}.brand{font-size:1.35rem;}.brand svg{width:36px;height:36px;}
+  .status{font-size:.61rem;padding:5px 9px;margin-left:0;}.status-full{display:none;}.status-short{display:inline;}
+  .mobile-explore{display:inline-block;margin-left:auto;font-size:.76rem;color:inherit;text-decoration:none;padding:8px 0;}
+  .intro{left:24px;right:24px;top:94px;}.intro h1{font-size:clamp(2.55rem,10.1vw,3.6rem);}
+  .intro p{font-size:.83rem;max-width:27rem;}.intro .btn{font-size:.76rem;padding:.9em 1.2em;min-height:43px;}
+  .input-card{padding:22px;}.predict-grid{gap:22px;}.plate .mol svg{height:260px;}.sec-head{margin-bottom:28px;}
+  .spec div{grid-template-columns:1fr;gap:4px;}.spec dt{font-weight:600;}.player-foot .btn{font-size:.75rem;}
+  .step-scrub{gap:8px;font-size:.64rem;}.scene-caption{display:none;}.fold-note{display:inline;font-size:.57rem;}.field input.smiles{font-size:1rem;}
+  .panel{max-height:35svh;padding:14px 16px;}.legend{gap:.3em;}.legend li{font-size:.7rem;}
+}
+@media (max-height:700px) and (max-width:860px){
+  .intro{top:84px;}.intro .eyebrow{margin-bottom:10px;}.intro h1{font-size:2.65rem;margin-bottom:12px;}
+  .intro p{font-size:.77rem;margin-bottom:13px;}.hero-note{display:none;}.hint{bottom:58px;}
+  .panel{max-height:34svh;}.panel h2{font-size:1.1rem;}.legend li{font-size:.64rem;}
+}
+
+
+
+.diagram-tools{display:none;}
+.result-grid > *, .predict-grid > *{min-width:0;}
+.diagram-viewport{width:100%;max-width:100%;min-width:0;}
+@media (max-width:600px){
+ .diagram-tools{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 6px;}
+ .diagram-tools span{font-size:.62rem;color:var(--st-ink-2);max-width:9rem;line-height:1.6;}
+ .diagram-zoom{font:inherit;font-size:.68rem;color:var(--st-ink);background:transparent;border:1px solid rgba(239,230,209,.3);border-radius:999px;min-height:40px;padding:8px 12px;cursor:pointer;flex:none;}
+ .diagram-viewport{overflow-x:auto;scrollbar-color:var(--st-ochre) transparent;overscroll-behavior-x:contain;}
+ .diagram-viewport.zoomed svg.mech{width:560px;min-width:560px;max-width:none;max-height:none;}
+}
+
+
+
+/* Quiet maple contours and warm light; the science remains the focus. */
+::selection{background:#A45038;color:#FFF0D1;}
+.field input::placeholder{color:#C29877;opacity:1;}
+.msg.err{color:#FFC8B4;}
+.section{position:relative;isolation:isolate;background:var(--bg);overflow:clip;}
+.section .wrap{position:relative;z-index:1;}
+.nav.on-page{background:rgba(50,28,23,.94);}
+.input-card{background:linear-gradient(145deg,#48291F,#3D221B);border-color:#80513C;box-shadow:0 16px 48px rgba(24,10,7,.15);}
+.plate{background-color:#4C2B21;background-image:radial-gradient(rgba(238,183,113,.13) .8px,transparent 1px);}
+.banner{background:#48291F;border-color:#98613E;}
+.section .eyebrow{color:#E3AE69;}
+.section-introduction{margin-bottom:40px;}
+.section-introduction .sec-head{margin-bottom:0;}
+.stage{background:radial-gradient(ellipse 68% 95% at 87% 50%,rgba(183,97,37,.30),transparent 74%),radial-gradient(ellipse 65% 95% at 4% 98%,rgba(145,43,39,.22),transparent 74%),linear-gradient(115deg,#2E1916 4%,#3A211B 53%,#512D20 100%);}
+.ambient-field{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;user-select:none;transition:opacity .7s ease;}
+.contour,.contour-trace{fill:none;stroke:#DEA060;stroke-width:1.05;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;}
+.contour{opacity:.14;}
+.contour-1,.contour-3{opacity:.1;}
+.contour-trace{stroke:#FFD19C;stroke-width:1.4;opacity:.35;stroke-dasharray:55 945;animation:contour-travel 22s linear infinite;}
+@keyframes contour-travel{from{stroke-dashoffset:1000}to{stroke-dashoffset:0}}
+.stage.zoomed .ambient-field{opacity:0;}
+.motion-paused .contour-trace,.ambient-rest .contour-trace,.stage.zoomed .contour-trace{animation-play-state:paused;}
+/* Sugar-maple line studies remain visible in both lower sections. */
+.maple-field{position:absolute;width:clamp(440px,42vw,620px);height:auto;max-width:none;aspect-ratio:1;pointer-events:none;user-select:none;z-index:0;overflow:visible;}
+.maple-field path{fill:none;stroke:#E7A66A;stroke-width:1.25;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;}
+.maple-outline{opacity:.4;}
+.maple-echo{opacity:.14;}
+.maple-field .maple-veins{stroke:#D99559;stroke-width:1;opacity:.24;}
+.maple-stem{opacity:.34;}
+.maple-field .maple-trace{stroke:#F4C385;stroke-width:1.7;opacity:.6;stroke-dasharray:70 930;animation:contour-travel 28s linear infinite;animation-play-state:paused;}
+.section.maple-visible .maple-trace{animation-play-state:running;}
+.motion-paused .section .maple-trace,.page-hidden .section .maple-trace{animation-play-state:paused;}
+.workspace-maple{top:12px;right:-24px;transform:rotate(-14deg);}
+.model-maple{width:clamp(520px,45vw,680px);left:-100px;bottom:-110px;transform:rotate(22deg);mask-image:linear-gradient(25deg,#000 15%,#000a 68%,#0005);-webkit-mask-image:linear-gradient(25deg,#000 15%,#000a 68%,#0005);}
+#predict{background:radial-gradient(ellipse 65% 55% at 100% 0,rgba(169,80,34,.16),transparent 72%),var(--bg);}
+
+#model{background:radial-gradient(ellipse at 0 110%,rgba(143,53,39,.17),transparent 68%),linear-gradient(110deg,#382019,#321C17 70%);border-top:1px solid #79503D;overflow:clip;}
+footer{background:#321C17;border-top:1px solid #79503D;}
+@media(max-width:860px){.contour-1,.contour-3{display:none;}.ambient-field{opacity:.65;}.workspace-maple{width:420px;right:-60px;top:28px;}.model-maple{width:500px;left:-130px;bottom:-80px;}.section-introduction{margin-bottom:32px;}}
+@media(max-width:600px){.ambient-field{width:170%;left:-40%;opacity:.45;}.maple-field{width:320px;}.workspace-maple{right:-66px;top:64px;mask-image:linear-gradient(90deg,#0004,#000 76%);-webkit-mask-image:linear-gradient(90deg,#0004,#000 76%);}.model-maple{width:350px;left:-100px;top:78px;bottom:auto;mask-image:linear-gradient(110deg,#000,#0006 68%,#0003);-webkit-mask-image:linear-gradient(110deg,#000,#0006 68%,#0003);}.maple-outline{opacity:.42;}.maple-echo{opacity:.14;}.maple-field .maple-veins{opacity:.25;}.section-introduction{margin-bottom:28px;}}
+@media(prefers-reduced-motion:reduce){.contour-trace,.maple-trace{display:none;}}
+
+</style>
+</head>
+<body>
+<a class="skip-link" href="#predict">Skip to the mechanism explorer</a>
+<noscript><p class="noscript">This interactive prototype needs JavaScript to draw molecules and mechanisms. Differ’s prediction model is in development. The examples below are illustrative.</p></noscript>
+
+<svg class="defs" aria-hidden="true" focusable="false">
+  <defs>
+    <radialGradient id="haloGrad">
+      <stop offset="0" stop-color="#E8B86D" stop-opacity=".75"/>
+      <stop offset=".45" stop-color="#FF8C3A" stop-opacity=".28"/>
+      <stop offset="1" stop-color="#FF8C3A" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="eGlow">
+      <stop offset="0" stop-color="#FFF3D6" stop-opacity=".95"/>
+      <stop offset=".35" stop-color="#E8B86D" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#E8B86D" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3.2"/></filter>
+  </defs>
+</svg>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="Differ home">
+    <svg class="hawk-mark" viewBox="0 0 256 256" aria-hidden="true"><path fill="currentColor" d="M70 82 C71 76 76 73 82 75 C92 77 96 84 108 85
+ Q120 70 132 54 L170 28 158 51 200 20 179 57
+ L218 35 192 74 225 58 201 92 225 84 200 109
+ L218 109 193 130 Q177 141 157 142
+ L162 151 201 167 205 181 197 184 198 195 186 201 180 198 172 207 160 205 142 167
+ Q134 160 124 163 Q104 183 83 183
+ L73 191 70 182 52 186 55 175 34 179 44 163 22 164 39 148 18 145 43 132 22 122
+ Q56 128 79 111 Q84 106 88 98
+ Q86 92 81 88 Q76 85 73 87 L70 91 Q68 87 70 82 Z"/></svg>
+    Differ
+  </a>
+  <nav class="nav-links" aria-label="Sections">
+    <a href="#story">Mechanism</a>
+    <a href="#predict">Explore</a>
+    <a href="#model">Model status</a>
+  </nav>
+  <a class="mobile-explore" href="#predict">Explore</a>
+  <span class="status"><i aria-hidden="true"></i><span class="status-full">Model in development</span><span class="status-short">Prototype</span></span>
+</header>
+
+<main id="top">
+  <section class="story" id="story" aria-label="Enzyme mechanism, scroll to step through it">
+    <div class="stage" id="stage">
+      <svg class="ambient-field" id="ambientField" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+        <defs>
+          <linearGradient id="ambientInkFade" x1="0" y1="0" x2="1600" y2="0" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="black"/><stop offset=".32" stop-color="black"/><stop offset=".58" stop-color="white"/><stop offset="1" stop-color="white"/></linearGradient>
+          <mask id="ambientEdgeMask" maskUnits="userSpaceOnUse" x="0" y="0" width="1600" height="1000"><rect width="1600" height="1000" fill="url(#ambientInkFade)"/><ellipse cx="1040" cy="530" rx="290" ry="260" fill="black" opacity=".4"/></mask>
+        </defs>
+        <g mask="url(#ambientEdgeMask)">
+          <g class="contour-family" transform="translate(1245 660) rotate(-18)">
+            <path class="contour contour-0" pathLength="1000" transform="scale(2.8)" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+<path class="contour contour-1" pathLength="1000" transform="scale(2.5)" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+<path class="contour contour-2" pathLength="1000" transform="scale(2.2)" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+<path class="contour contour-3" pathLength="1000" transform="scale(1.9)" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+<path class="contour contour-4" pathLength="1000" transform="scale(1.6)" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+            <path class="contour-trace" pathLength="1000" transform="scale(2.5)" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+          </g>
+        </g>
+      </svg>
+      <canvas id="cloud" aria-hidden="true"></canvas>
+      <svg id="stageSvg" role="img" aria-label="Enzyme active site. Scrolling zooms in and draws the curved electron-pushing arrows for each catalytic step.">
+        <g id="chemWrap"><g class="chem" id="stageChem"></g></g>
+      </svg>
+
+      <div class="intro" id="intro">
+        <div class="eyebrow">Enzyme mechanism explorer</div>
+        <h1>See chemistry<br><em>unfold.</em></h1>
+        <p id="heroSub">From substrate to product, follow the electron moves that make a reaction happen.</p>
+        <div class="actions">
+          <a class="btn primary" href="#predict">Explore the prototype <svg viewBox="0 0 16 16" aria-hidden="true" width="14" height="14"><path d="M3 13 13 3M4 3h9v9" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></a>
+          <button class="btn ghost" type="button" id="watchBtn">Follow the reaction <span aria-hidden="true">↓</span></button>
+        </div>
+        <p class="hero-note">Illustrated examples. A preview of the model to come.</p>
+      </div>
+
+      <div class="scene-caption"><b>A closer look at catalysis</b><span id="sceneName">Chymotrypsin · amide hydrolysis</span></div>
+      <div class="stage-tools"><button class="motion-button" id="motionToggle" type="button" aria-pressed="false">Pause motion</button><span class="fold-note">Illustrative protein ribbons</span></div>
+      <div class="stage-progress" id="stageProgress" aria-hidden="true"></div>
+      <div class="hint" id="hint">Drag to rotate · scroll to enter the active site<span></span></div>
+      <div class="tip" id="tip" role="presentation"><b>Active site</b><span id="tipText"></span></div>
+      <div class="key" id="stageKey" aria-label="Colour key"></div>
+
+      <aside class="panel" id="panel" aria-live="polite"><div class="panel-inner" id="panelInner"></div></aside>
+      <nav class="rail" id="rail" aria-label="Mechanism steps"></nav>
+    </div>
+  </section>
+
+  <section class="section" id="predict">
+    <svg class="maple-field workspace-maple" viewBox="-240 -250 480 480" aria-hidden="true" focusable="false">
+      <path class="maple-echo" transform="translate(-10 5) scale(1.08)" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+      <path class="maple-outline" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+      <path class="maple-veins" d="M0 125 Q-3 0 0 -195 M0 111 Q-67 12 -155 -86 M0 111 Q67 12 155 -86 M0 114 Q-83 81 -178 20 M0 114 Q83 81 178 20"/>
+      <path class="maple-stem" d="M0 125 Q-3 161 -12 188"/>
+      <path class="maple-trace" pathLength="1000" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+    </svg>
+    <div class="wrap">
+      <div class="section-introduction">
+      <header class="sec-head">
+        <div class="eyebrow">The reaction workspace</div>
+        <h2>Start with a substrate.<br><em>Follow every change.</em></h2>
+        <p>Draw a structure from SMILES, or choose an illustrated example to reveal its products and step through the mechanism. Live model predictions are coming.</p>
+      </header>
+      </div>
+
+      <div class="predict-grid">
+        <form class="input-card" id="predictForm" novalidate>
+          <div class="field">
+            <label for="smiles">Substrate SMILES</label>
+            <input class="smiles" id="smiles" name="smiles" type="text" maxlength="2000" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="smilesMsg">
+            <p class="msg" id="smilesMsg" role="status" aria-live="polite"></p>
+          </div>
+          <p class="chips-label" id="chipsLabel">Illustrated examples</p>
+          <div class="chips" id="chips" role="group" aria-labelledby="chipsLabel"></div>
+          <div class="field">
+            <label for="enzyme">Enzyme context <small>from the selected example</small></label>
+            <input id="enzyme" name="enzyme" type="text" readonly aria-describedby="contextNote" placeholder="Choose an example to see its enzyme">
+            <p class="msg" id="contextNote">An enzyme and its cofactors give the reaction context.</p>
+          </div>
+          <button class="btn primary" type="button" id="predictBtn">Explore example mechanism <span aria-hidden="true">↗</span></button>
+          <p class="form-note">This prototype runs in your browser. Custom prediction is not connected yet.</p>
+        </form>
+
+        <figure class="plate" aria-labelledby="previewCap">
+          <div class="preview-label"><span>Substrate study</span><span>SMILES → structure</span></div>
+          <div class="mol" id="previewMol"><p class="empty">Type a SMILES string to draw the substrate.</p></div>
+          <figcaption id="previewCap"><b>Substrate</b><span id="previewMeta">Drawn from your SMILES</span></figcaption>
+        </figure>
+      </div>
+
+      <div class="result" id="result" aria-busy="false" hidden>
+        <ul class="loading" id="loading" hidden>
+          <li><i></i>Reading the input structure</li>
+          <li><i></i>Opening the illustrated example</li>
+          <li><i></i>Drawing the mechanism</li>
+        </ul>
+        <div id="resultBody" hidden>
+          <div class="banner">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 5.8v5.2M10 13.6v.6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            <span id="bannerText" role="status"></span>
+          </div>
+          <div class="result-grid">
+            <div>
+              <h3>Products</h3>
+              <div class="products" id="products"></div>
+            </div>
+            <div class="pending-mechanism" id="pendingMechanism" hidden><div class="eyebrow">Prediction in development</div><h3>A place for your mechanism.</h3><p>The structure is ready to explore. Products and reaction steps for custom inputs will appear here when the model is connected.</p><a href="#predict">Choose an illustrated example</a></div>
+            <div class="player" id="player">
+              <div class="player-top">
+                <div class="tabs" id="tabs" role="group" aria-label="Choose a step"></div>
+                <button class="play" type="button" id="playBtn" aria-pressed="true"></button>
+              </div>
+              <div class="diagram-tools"><button class="diagram-zoom" id="zoomDrawing" type="button" aria-pressed="false" aria-controls="diagramViewport">Enlarge drawing</button><span id="diagramHint">Inspect the chemical details</span></div>
+              <div class="diagram-viewport" id="diagramViewport" tabindex="0" aria-label="Mechanism drawing. When enlarged, scroll horizontally to pan."><svg class="mech" id="playerSvg" role="img" aria-label="Arrow-pushing drawing of the selected step"><g class="chem" id="playerChem"></g></svg></div>
+              <div class="step-scrub"><label for="stepProgress">Step progress</label><input id="stepProgress" type="range" min="0" max="100" step="0.1" value="0" aria-valuetext="0 percent"><output id="stepProgressText" for="stepProgress">0%</output></div>
+              <div class="key" id="playerKey" aria-label="Colour key"></div>
+              <div class="cap" aria-live="polite">
+                <h4 id="capTitle"></h4>
+                <p id="capText"></p>
+                <ol class="legend" id="capLegend"></ol>
+              </div>
+              <div class="player-foot">
+                <p class="ref" id="playerRef"></p>
+                <button class="export-step" type="button" id="exportStep">Save this drawing ↓</button>
+                <button class="btn primary" type="button" id="toStage">Explore in the scroll scene</button>
+              </div>
+              <p class="drawing-note">Curved arrows show electron-pair redistribution. Motion and timing are illustrative; some elementary events are grouped for clarity.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="model">
+    <svg class="maple-field model-maple" viewBox="-240 -250 480 480" aria-hidden="true" focusable="false">
+      <path class="maple-echo" transform="translate(-10 5) scale(1.08)" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+      <path class="maple-outline" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+      <path class="maple-veins" d="M0 125 Q-3 0 0 -195 M0 111 Q-67 12 -155 -86 M0 111 Q67 12 155 -86 M0 114 Q-83 81 -178 20 M0 114 Q83 81 178 20"/>
+      <path class="maple-stem" d="M0 125 Q-3 161 -12 188"/>
+      <path class="maple-trace" pathLength="1000" d="M0 125 C-23 142 -49 147 -73 139 L-67 116 C-101 123 -126 110 -143 91 L-177 66 L-147 59 C-163 39 -177 23 -196 12 L-159 -3 C-147 -7 -132 -12 -124 -21 C-115 -32 -118 -44 -130 -55 L-171 -96 L-137 -92 L-144 -125 L-111 -108 C-100 -101 -87 -91 -77 -83 C-66 -75 -53 -80 -51 -96 L-53 -140 L-30 -129 L-32 -172 L-13 -155 L0 -218 L13 -155 L32 -172 L30 -129 L53 -140 L51 -96 C53 -80 66 -75 77 -83 C87 -91 100 -101 111 -108 L144 -125 L137 -92 L171 -96 L130 -55 C118 -44 115 -32 124 -21 C132 -12 147 -7 159 -3 L196 12 C177 23 163 39 147 59 L177 66 L143 91 C126 110 101 123 67 116 L73 139 C49 147 23 142 0 125 Z"/>
+    </svg>
+    <div class="wrap status-grid">
+      <div class="sec-head" style="margin-bottom:0">
+        <div class="eyebrow">A work in progress</div>
+        <h2>The interface is here.<br><em>The model is growing.</em></h2>
+        <p>Differ is being developed to predict enzyme reaction mechanisms. For now, explore three hand-authored examples inspired by M‑CSA. Every displayed mechanism is an illustration.</p>
+      </div>
+      <div>
+        <p class="status-intro">The planned prediction interface brings together four views of a reaction.</p>
+        <dl class="spec">
+          <div><dt>Products</dt><dd>Product structures and a SMILES string for each released species.</dd></div>
+          <div><dt>Steps</dt><dd>A sequence of bond changes, intermediates and catalytic events, with an explanation for each step.</dd></div>
+          <div><dt>Electron moves</dt><dd>Curved arrows connecting the electron-pair source to its destination, aligned with the changing bonds.</dd></div>
+          <div><dt>Enzyme context</dt><dd>The substrate, catalytic residues, cofactors and water, with their roles made visible.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span class="source-note">Illustrative mechanisms adapted from the <a href="https://www.ebi.ac.uk/thornton-srv/m-csa/" target="_blank" rel="noopener noreferrer">Mechanism and Catalytic Site Atlas</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener noreferrer">CC BY 4.0</a>). Some events are grouped for clarity. <a href="https://www.ebi.ac.uk/thornton-srv/m-csa/entry/387/" target="_blank" rel="noopener noreferrer">Chymotrypsin</a> · <a href="https://www.ebi.ac.uk/thornton-srv/m-csa/entry/324/" target="_blank" rel="noopener noreferrer">TIM</a> · <a href="https://www.ebi.ac.uk/thornton-srv/m-csa/entry/584/" target="_blank" rel="noopener noreferrer">LDH</a>.</span>
+    <span>Differ · Interactive prototype<br>Illustrative folds; no experimental 3D coordinates.</span>
+  </div>
+</footer>
+
+<script src="./assets/vendor/smiles-drawer-2.1.7.min.js"></script>
+<script>
+(() => {
+'use strict';
+const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+let reduceMotion = motionPreference.matches;
+let motionPaused = reduceMotion, stageClock = 0;
+const NS = 'http://www.w3.org/2000/svg';
+const $ = (s, r = document) => r.querySelector(s);
+const mk = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag); if (attrs) for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; };
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (x, a, b) => clamp((x - a) / (b - a));
+const ease = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const smooth = t => t * t * (3 - 2 * t);
+const bell = t => Math.sin(Math.PI * clamp(t));
+const f1 = n => Math.round(n * 10) / 10;
+const op2 = v => String(Math.round(clamp(v) * 100) / 100);
+const P = (x, y, r, deg) => [x + r * Math.cos(deg * Math.PI / 180), y - r * Math.sin(deg * Math.PI / 180)];
+const toward = (p, q, d) => { const dx = q[0] - p[0], dy = q[1] - p[1], l = Math.hypot(dx, dy) || 1; return [p[0] + dx / l * d, p[1] + dy / l * d]; };
+const key2 = (a, b) => a < b ? a + '|' + b : b + '|' + a;
+const A = (t, k, g, auto) => ({ t, k, g, auto: !!auto });
+const GROUP_NAMES = { sub: 'Substrate', enz: 'Enzyme residues', cof: 'Cofactor', wat: 'Water' };
+
+/* =========================================================
+   Example mechanisms, redrawn after M-CSA.
+   Each atom has a label (t), a label kind (k) and a role group (g).
+   Atoms marked auto take the role of the atom they are bonded to,
+   so a proton changes colour when it moves between molecules.
+   ========================================================= */
+
+const CHYMO = (() => {
+  const HC = [370, 395], HR = 36;
+  const hNE = P(...HC, HR, 50), hND = P(...HC, HR, 194), hCG = P(...HC, HR, 266);
+  const HIS_H = P(...hNE, 33, 50);
+  const e = 'enz';
+  return {
+    id: 'chymo', enzyme: 'Chymotrypsin', enzymeInline: 'chymotrypsin', reactionInline: 'amide hydrolysis', ec: 'EC 3.4.21.1', fold: 'barrels', seed: 11,
+    reaction: 'Amide hydrolysis', substrate: 'N‑acetyl‑L‑phenylalanine N‑methylamide', chip: 'Ac‑Phe‑NHMe',
+    smiles: 'CC(=O)N[C@@H](Cc1ccccc1)C(=O)NC',
+    aliases: [], // Demo matching uses only the exact example SMILES.
+    products: [{ name: 'N‑acetyl‑L‑phenylalanine', smiles: 'CC(=O)N[C@@H](Cc1ccccc1)C(=O)O' }, { name: 'Methylamine', smiles: 'CN' }],
+    equation: 'Ac‑Phe‑NHMe + H₂O → Ac‑Phe‑OH + CH₃NH₂',
+    site: { title: 'The catalytic triad', text: 'Ser195 provides the nucleophile, His57 moves protons and Asp102 tunes and stabilizes His57’s acid–base chemistry. Backbone NH groups of Gly193 and Ser195 form the oxyanion hole above the substrate carbonyl.', note: 'R marks the N‑acetyl‑L‑phenylalanyl group of the substrate.' },
+    done: { title: 'One amide in, an acid and an amine out', text: 'Two tetrahedral intermediates and four proton transfers through His57 complete one turnover.' },
+    motifs3d: ['Ser195', 'His57', 'Asp102'], ligands3d: [['sub', 'Substrate']],
+    atoms: {
+      rAsp: A('Asp102', 'res', e), aCB: A('', '', e), aCG: A('', '', e), aO1: A('O', 'O', e), aO2: A('O', 'O', e),
+      rHis: A('His57', 'res', e), hCB: A('', '', e), hCG: A('', '', e), hND: A('N', 'N', e), hHD: A('H', 'H', e), hCE: A('', '', e), hNE: A('N', 'N', e), hCD: A('', '', e),
+      rSer: A('Ser195', 'res', e), sCB: A('', '', e), sOG: A('O', 'O', e),
+      rGly: A('Gly193', 'res', e), gN: A('N', 'N', e), gH: A('H', 'H', e),
+      rSbb: A('Ser195', 'res', e), bN: A('N', 'N', e), bH: A('H', 'H', e),
+      C1: A('', '', 'sub'), O1: A('O', 'O', 'sub'), R: A('R', 'R', 'sub'), N: A('N', 'N', 'sub'), H2: A('H', 'H', 'sub'), Me: A('CH₃', 'C', 'sub'),
+      H1: A('H', 'H', e, 1), Ow: A('O', 'O', 'wat', 1), Hw1: A('H', 'H', 'wat', 1), Hw2: A('H', 'H', 'wat', 1)
+    },
+    base: {
+      rAsp: [150, 506], aCB: [170, 458], aCG: [198, 412], aO1: [170, 368], aO2: [250, 412],
+      hNE, hCE: P(...HC, HR, 122), hND, hCG, hCD: P(...HC, HR, 338), hHD: P(...hND, 27, 194), hCB: P(...hCG, 48, 266), rHis: [364, 528],
+      sCB: [412, 252], rSer: [374, 214], rGly: [418, 112], gN: [452, 148], gH: [467, 176], rSbb: [598, 112], bN: [562, 148], bH: [547, 176]
+    },
+    sub: {
+      S0: { sOG: [440, 300], H1: [425, 322], C1: [535, 285], O1: [507, 237], R: [590, 285], N: [507, 333], H2: [480, 333], Me: [533, 378] },
+      S1: { sOG: [448, 298], H1: HIS_H, C1: [500, 298], O1: [500, 240], R: [556, 298], N: [500, 356], H2: [527, 351], Me: [518, 405] },
+      S2: { sOG: [448, 298], C1: [500, 292], O1: [514, 239], R: [544, 327], N: [480, 400], H1: [454, 407], H2: [473, 426], Me: [532, 410] },
+      S2w: { sOG: [448, 298], C1: [500, 292], O1: [514, 239], R: [544, 327], Ow: [487, 366], Hw1: [460, 368], Hw2: [497, 392] },
+      S3: { sOG: [448, 298], C1: [500, 298], O1: [500, 240], R: [556, 298], Ow: [500, 356], Hw2: [523, 370], Hw1: HIS_H },
+      S4: { sOG: [440, 300], Hw1: [425, 322], C1: [592, 290], O1: [582, 236], R: [644, 309], Ow: [550, 325], Hw2: [541, 350] }
+    },
+    baseBonds: [
+      ['rAsp', 'aCB', 1], ['aCB', 'aCG', 1], ['aCG', 'aO1', 2], ['aCG', 'aO2', 1],
+      ['rHis', 'hCB', 1], ['hCB', 'hCG', 1], ['hCG', 'hND', 1], ['hND', 'hCE', 1], ['hCE', 'hNE', 2, HC], ['hNE', 'hCD', 1], ['hCD', 'hCG', 2, HC], ['hND', 'hHD', 1],
+      ['rSer', 'sCB', 1], ['sCB', 'sOG', 1], ['rGly', 'gN', 1], ['gN', 'gH', 1], ['rSbb', 'bN', 1], ['bN', 'bH', 1]
+    ],
+    subBonds: {
+      S0: [['sOG', 'H1', 1], ['C1', 'O1', 2], ['C1', 'R', 1], ['C1', 'N', 1], ['N', 'H2', 1], ['N', 'Me', 1]],
+      S1: [['hNE', 'H1', 1], ['sOG', 'C1', 1], ['C1', 'O1', 1], ['C1', 'R', 1], ['C1', 'N', 1], ['N', 'H2', 1], ['N', 'Me', 1]],
+      S2: [['sOG', 'C1', 1], ['C1', 'O1', 2], ['C1', 'R', 1], ['N', 'H1', 1], ['N', 'H2', 1], ['N', 'Me', 1]],
+      S2w: [['sOG', 'C1', 1], ['C1', 'O1', 2], ['C1', 'R', 1], ['Ow', 'Hw1', 1], ['Ow', 'Hw2', 1]],
+      S3: [['hNE', 'Hw1', 1], ['sOG', 'C1', 1], ['C1', 'O1', 1], ['C1', 'R', 1], ['C1', 'Ow', 1], ['Ow', 'Hw2', 1]],
+      S4: [['sOG', 'Hw1', 1], ['C1', 'O1', 2], ['C1', 'R', 1], ['C1', 'Ow', 1], ['Ow', 'Hw2', 1]]
+    },
+    hb: {
+      S0: [['aO2', 'hHD'], ['H1', 'hNE'], ['gH', 'O1'], ['bH', 'O1']],
+      S1: [['aO2', 'hHD'], ['H1', 'N'], ['gH', 'O1'], ['bH', 'O1']],
+      S2: [['aO2', 'hHD'], ['gH', 'O1'], ['bH', 'O1']],
+      S2w: [['aO2', 'hHD'], ['Hw1', 'hNE'], ['gH', 'O1'], ['bH', 'O1']],
+      S3: [['aO2', 'hHD'], ['Hw1', 'sOG'], ['gH', 'O1'], ['bH', 'O1']],
+      S4: [['aO2', 'hHD'], ['Hw1', 'hNE']]
+    },
+    chg: {
+      S0: { aO2: ['−', 60] }, S1: { aO2: ['−', 60], O1: ['−', 15], hNE: ['+', 340] }, S2: { aO2: ['−', 60] }, S2w: { aO2: ['−', 60] },
+      S3: { aO2: ['−', 60], O1: ['−', 15], hNE: ['+', 340] }, S4: { aO2: ['−', 60] }
+    },
+    siteHalos: [[['sOG', 'rSer'], 0, .45], [['hNE', 'hND', 'rHis'], .2, .65], [['aO2', 'rAsp'], .4, .85], [['gH', 'bH'], .6, 1]],
+    doneHalos: { O1: .4, Ow: .4, R: .3 },
+    bb: { x: 120, y: 92, w: 560, h: 450 },
+    steps: [
+      { from: 'S0', to: 'S1', title: 'Ser195 attacks the carbonyl', short: 'Attack',
+        text: 'His57 acts as a general base while Ser195 Oγ adds to the amide carbon. The oxyanion hole holds the new negative charge on the first tetrahedral intermediate.',
+        arrows: [
+          { from: { lp: 'hNE', dir: 40 }, to: { atom: 'H1' }, bend: .55, say: 'The His57 Nε2 lone pair takes the proton from Ser195 Oγ.' },
+          { from: { bond: ['sOG', 'H1'] }, to: { bond: ['sOG', 'C1'] }, bend: -.5, say: 'The O–H bond electrons become the new O–C bond to the carbonyl carbon.' },
+          { from: { bond: ['C1', 'O1'] }, to: { atom: 'O1' }, bend: .95, say: 'The C=O π electrons move onto oxygen, forming the oxyanion.' }
+        ] },
+      { from: 'S1', to: 'S2', title: 'Methylamine leaves', short: 'Amine leaves',
+        text: 'The intermediate collapses. His57 now acts as a general acid and protonates the leaving nitrogen, so the acyl group stays esterified to Ser195.',
+        arrows: [
+          { from: { lp: 'O1', dir: 165 }, to: { bond: ['C1', 'O1'] }, bend: .8, say: 'The oxyanion lone pair reforms the C=O π bond.' },
+          { from: { bond: ['C1', 'N'] }, to: { bond: ['N', 'H1'] }, bend: .3, say: 'The C–N bond electrons move to nitrogen, which picks up the His57 proton.' },
+          { from: { bond: ['hNE', 'H1'] }, to: { atom: 'hNE' }, bend: .95, say: 'The N–H bond of His57 returns its electrons to Nε2.' }
+        ] },
+      { pre: 'S2', exit: [90, 70], enter: [-30, 90], from: 'S2w', to: 'S3', title: 'Water attacks the acyl‑enzyme', short: 'Water attacks',
+        text: 'Water fills the space the amine left. His57 acts as a general base again and activates the water for attack on the ester carbonyl.',
+        arrows: [
+          { from: { lp: 'hNE', dir: 55 }, to: { atom: 'Hw1' }, bend: -.55, say: 'The His57 Nε2 lone pair takes a proton from water.' },
+          { from: { bond: ['Ow', 'Hw1'] }, to: { bond: ['Ow', 'C1'] }, bend: -.6, say: 'The water O–H electrons become the new O–C bond.' },
+          { from: { bond: ['C1', 'O1'] }, to: { atom: 'O1' }, bend: .95, say: 'The C=O π electrons move onto oxygen.' }
+        ] },
+      { from: 'S3', to: 'S4', title: 'The acid leaves and Ser195 resets', short: 'Acid leaves',
+        text: 'The second intermediate collapses, His57 returns the proton to Ser195 and the carboxylic acid diffuses away. The enzyme is ready for the next substrate.',
+        arrows: [
+          { from: { lp: 'O1', dir: 165 }, to: { bond: ['C1', 'O1'] }, bend: .8, say: 'The oxyanion lone pair reforms the C=O π bond.' },
+          { from: { bond: ['C1', 'sOG'] }, to: { bond: ['sOG', 'Hw1'] }, bend: -.45, say: 'The C–O(Ser195) bond electrons move to Oγ, which takes back the proton.' },
+          { from: { bond: ['hNE', 'Hw1'] }, to: { atom: 'hNE' }, bend: .95, say: 'The N–H bond of His57 returns its electrons to Nε2.' }
+        ] }
+    ]
+  };
+})();
+
+const TIM = (() => {
+  const HC = [372, 128], HR = 36, e = 'enz';
+  const hNE = P(...HC, HR, 270), hCE = P(...HC, HR, 342), hND = P(...HC, HR, 54), hCG = P(...HC, HR, 126), hCD = P(...HC, HR, 198);
+  const glu0 = { rGlu: [345, 500], gCG: [359, 455], gCD: [385, 410], gO1: [359, 365], gO2: [437, 410] };
+  const glu1 = { rGlu: [365, 500], gCG: [379, 455], gCD: [405, 410], gO1: [379, 365], gO2: [457, 410] };
+  return {
+    id: 'tim', enzyme: 'Triosephosphate isomerase', enzymeInline: 'triosephosphate isomerase', reactionInline: 'the isomerization of DHAP', ec: 'EC 5.3.1.1', fold: 'tim', seed: 31,
+    reaction: 'Isomerization of DHAP', substrate: 'Dihydroxyacetone phosphate', chip: 'DHAP',
+    smiles: 'OCC(=O)COP(=O)([O-])[O-]',
+    aliases: [], // Demo matching uses only the exact example SMILES.
+    products: [{ name: 'D‑Glyceraldehyde 3‑phosphate', smiles: 'C([C@H](C=O)O)OP(=O)([O-])[O-]' }],
+    equation: 'DHAP → D‑glyceraldehyde 3‑phosphate',
+    site: { title: 'Glu165, His95 and Lys13', text: 'Glu165 is the base that removes a proton from carbon. His95 moves protons between the two oxygens, and Lys13 stabilizes the negative charge that builds up on oxygen.', note: 'The phosphate of DHAP is drawn as one group.' },
+    done: { title: 'The carbonyl moves from C2 to C1', text: 'Two proton transfers on carbon through Glu165 and two on oxygen through His95 turn the ketose into the aldose.' },
+    motifs3d: ['Glu165', 'His95', 'Lys13'], ligands3d: [['sub', 'DHAP']],
+    atoms: {
+      rHis: A('His95', 'res', e), hCB: A('', '', e), hCG: A('', '', e), hND: A('N', 'N', e), hCE: A('', '', e), hNE: A('N', 'N', e), hCD: A('', '', e),
+      rGlu: A('Glu165', 'res', e), gCG: A('', '', e), gCD: A('', '', e), gO1: A('O', 'O', e), gO2: A('O', 'O', e),
+      rLys: A('Lys13', 'res', e), lNZ: A('NH₃', 'C', e),
+      C1: A('', '', 'sub'), C2: A('', '', 'sub'), C3: A('', '', 'sub'), O1: A('O', 'O', 'sub'), O2: A('O', 'O', 'sub'), Pg: A('OPO₃²⁻', 'L', 'sub'),
+      H1: A('H', 'H', 'sub', 1), H1b: A('H', 'H', 'sub', 1), Ho1: A('H', 'H', 'sub', 1), Hh: A('H', 'H', e, 1)
+    },
+    base: { rHis: [300, 26], hCB: P(...hCG, 46, 126), hCG, hND, hCE, hNE, hCD, rLys: [520, 148], lNZ: [466, 190], C3: [457, 296], Pg: [508, 268] },
+    sub: {
+      S0: Object.assign({}, glu0, { C1: [360, 300], C2: [412, 270], O2: [412, 215], O1: [334, 255], Ho1: [344, 229], H1: [360, 327], H1b: [337, 313], Hh: toward(hNE, [412, 215], 27) }),
+      S1: Object.assign({}, glu1, { C1: [362, 298], C2: [414, 272], O2: [414, 217], O1: [336, 253], Ho1: [346, 228], H1: toward([379, 365], [414, 272], 27), H1b: [338, 312], Hh: toward([414, 217], hNE, 27) }),
+      S2: Object.assign({}, glu0, { C1: [365, 300], C2: [414, 272], O2: [414, 217], O1: [338, 255], Ho1: toward(hNE, [338, 255], 27), H1: [414, 299], H1b: [339, 314], Hh: toward([414, 217], hNE, 27) })
+    },
+    baseBonds: [
+      ['rHis', 'hCB', 1], ['hCB', 'hCG', 1], ['hCG', 'hND', 1], ['hND', 'hCE', 2, HC], ['hCE', 'hNE', 1], ['hNE', 'hCD', 1], ['hCD', 'hCG', 2, HC],
+      ['rGlu', 'gCG', 1], ['gCG', 'gCD', 1], ['gCD', 'gO1', 1], ['gCD', 'gO2', 2], ['rLys', 'lNZ', 1],
+      ['C2', 'C3', 1], ['C3', 'Pg', 1], ['C1', 'H1b', 1]
+    ],
+    subBonds: {
+      S0: [['C1', 'C2', 1], ['C2', 'O2', 2], ['C1', 'O1', 1], ['O1', 'Ho1', 1], ['C1', 'H1', 1], ['hNE', 'Hh', 1]],
+      S1: [['C1', 'C2', 2], ['C2', 'O2', 1], ['C1', 'O1', 1], ['O1', 'Ho1', 1], ['gO1', 'H1', 1], ['O2', 'Hh', 1]],
+      S2: [['C1', 'C2', 1], ['C2', 'O2', 1], ['C1', 'O1', 2], ['hNE', 'Ho1', 1], ['C2', 'H1', 1], ['O2', 'Hh', 1]]
+    },
+    hb: {
+      S0: [['gO1', 'H1'], ['Hh', 'O2'], ['lNZ', 'O2']],
+      S1: [['Ho1', 'hNE'], ['lNZ', 'O2']],
+      S2: [['lNZ', 'O2'], ['Ho1', 'O1']]
+    },
+    chg: {
+      S0: { gO1: ['−', 150], lNZ: ['+', 90] },
+      S1: { hNE: ['−', 330], lNZ: ['+', 90] },
+      S2: { gO1: ['−', 150], lNZ: ['+', 90] }
+    },
+    siteHalos: [[['gO1', 'rGlu'], 0, .45], [['hNE', 'rHis'], .2, .65], [['lNZ', 'rLys'], .4, .85], [['O1', 'O2'], .6, 1]],
+    doneHalos: { O1: .4, O2: .4 },
+    bb: { x: 255, y: 6, w: 330, h: 514 },
+    steps: [
+      { from: 'S0', to: 'S1', title: 'The enediol forms', short: 'Enediol forms',
+        text: 'Glu165 removes the pro‑R proton from C1 while His95 protonates the carbonyl oxygen, giving a cis‑enediol intermediate.',
+        arrows: [
+          { from: { lp: 'gO1', dir: 85 }, to: { atom: 'H1' }, bend: .5, say: 'The Glu165 carboxylate takes the pro‑R proton from C1.' },
+          { from: { bond: ['C1', 'H1'] }, to: { bond: ['C1', 'C2'] }, bend: -.6, say: 'The C1–H electrons form the C1=C2 π bond.' },
+          { from: { bond: ['C2', 'O2'] }, to: { bond: ['O2', 'Hh'] }, bend: .6, say: 'The C2=O π electrons move to O2, which picks up the His95 proton.' },
+          { from: { bond: ['hNE', 'Hh'] }, to: { atom: 'hNE' }, bend: .95, say: 'The N–H bond of His95 returns its electrons to Nε2, leaving an imidazolate.' }
+        ] },
+      { from: 'S1', to: 'S2', title: 'The aldehyde forms', short: 'GAP forms',
+        text: 'His95, now an imidazolate, takes the proton from the C1 hydroxyl. The C1=O bond forms and Glu165 returns a proton to C2, giving D‑glyceraldehyde 3‑phosphate.',
+        arrows: [
+          { from: { lp: 'hNE', dir: 240 }, to: { atom: 'Ho1' }, bend: -.5, say: 'The His95 imidazolate takes the proton from O1.' },
+          { from: { bond: ['O1', 'Ho1'] }, to: { bond: ['C1', 'O1'] }, bend: .7, say: 'The O1–H electrons form the C1=O π bond.' },
+          { from: { bond: ['C1', 'C2'] }, to: { bond: ['C2', 'H1'] }, bend: -.5, say: 'The C1=C2 π electrons take the Glu165 proton, forming the C2–H bond.' },
+          { from: { bond: ['gO1', 'H1'] }, to: { atom: 'gO1' }, bend: .95, say: 'The O–H bond of Glu165 returns its electrons to oxygen.' }
+        ] }
+    ]
+  };
+})();
+
+const LDH = (() => {
+  const HC = [520, 150], HR = 36, NC = [325, 204], NR = 32, e = 'enz', c = 'cof';
+  const hNE = P(...HC, HR, 225), hCE = P(...HC, HR, 297), hND = P(...HC, HR, 9), hCG = P(...HC, HR, 81), hCD = P(...HC, HR, 153);
+  const nC4 = P(...NC, NR, 330), nC5 = P(...NC, NR, 30), nC6 = P(...NC, NR, 90), nN1 = P(...NC, NR, 150), nC2 = P(...NC, NR, 210), nC3 = P(...NC, NR, 270);
+  const pC2 = [440, 270], pO2 = [440, 215], pC1 = P(...pC2, 52, 330), pOa = P(...pC1, 52, 270), pOb = P(...pC1, 52, 30);
+  const aN = [410, 152], zN1 = [590, 290], zN2 = [556, 382];
+  return {
+    id: 'ldh', enzyme: 'L‑Lactate dehydrogenase', enzymeInline: 'L‑lactate dehydrogenase', reactionInline: 'pyruvate reduction by NADH', ec: 'EC 1.1.1.27', fold: 'rossmann', seed: 53,
+    reaction: 'Pyruvate reduction by NADH', substrate: 'Pyruvate, with NADH bound', chip: 'Pyruvate + NADH',
+    smiles: 'CC(=O)C(=O)[O-]',
+    aliases: [], // Demo matching uses only the exact example SMILES.
+    products: [{ name: 'L‑Lactate', smiles: 'C[C@H](O)C(=O)[O-]' }], cofactorOut: 'NAD⁺, the oxidized cofactor, is released after the step.',
+    equation: 'Pyruvate + NADH + H⁺ → L‑lactate + NAD⁺',
+    site: { title: 'His193, two arginines and NADH', text: 'His193, paired with Asp166, donates a proton to the carbonyl oxygen. Arg106 polarizes the carbonyl and Arg169 holds the carboxylate. NADH points its C4 hydrogen at the carbonyl carbon.', note: 'ADPR marks the adenosine diphosphate ribose part of NADH. Residue labels follow the M‑CSA reference structure.' },
+    done: { title: 'A ketone reduced to an alcohol', text: 'This simplified stage groups hydride transfer and protonation as pyruvate becomes L‑lactate. His193 picks up a new proton before the next turnover.' },
+    motifs3d: ['His193', 'Arg169', 'Arg106', 'Asp166'], ligands3d: [['cof', 'NADH'], ['sub', 'Pyruvate']],
+    atoms: {
+      rHis: A('His193', 'res', e), hCB: A('', '', e), hCG: A('', '', e), hND: A('N', 'N', e), hHD: A('H', 'H', e), hCE: A('', '', e), hNE: A('N', 'N', e), hCD: A('', '', e),
+      rAsp: A('Asp166', 'res', e), dCB: A('', '', e), dCG: A('', '', e), dO1: A('O', 'O', e), dO2: A('O', 'O', e),
+      rR109: A('Arg106', 'res', e), aN: A('N', 'N', e), aH: A('H', 'H', e),
+      rR171: A('Arg169', 'res', e), zNe: A('NH', 'NH', e), zC: A('', '', e), zN1: A('NH₂', 'C', e), zN2: A('NH₂', 'C', e),
+      nN1: A('N', 'N', c), nC2: A('', '', c), nC3: A('', '', c), nC4: A('', '', c), nC5: A('', '', c), nC6: A('', '', c), nR: A('ADPR', 'L', c), nAm: A('CONH₂', 'L', c),
+      nHs: A('H', 'H', c, 1), nHr: A('H', 'H', c, 1),
+      pC2: A('', '', 'sub'), pO2: A('O', 'O', 'sub'), pMe: A('CH₃', 'C', 'sub'), pC1: A('', '', 'sub'), pOa: A('O', 'O', 'sub'), pOb: A('O', 'O', 'sub'),
+      Hh: A('H', 'H', e, 1)
+    },
+    base: {
+      rHis: [540, 26], hCB: P(...hCG, 46, 81), hCG, hND, hCE, hNE, hCD, hHD: P(...hND, 27, 9),
+      rAsp: [730, 240], dCB: [704, 200], dCG: [672, 160], dO1: [682, 113], dO2: [634, 136],
+      rR109: [380, 112], aN, aH: toward(aN, pO2, 27),
+      rR171: [692, 402], zNe: [646, 362], zC: [598, 345], zN1, zN2,
+      nN1, nC2, nC3, nC4, nC5, nC6, nR: P(...nN1, 46, 150), nAm: P(...nC3, 46, 270), nHs: P(...nC4, 27, 30),
+      pC2, pO2, pMe: P(...pC2, 52, 210), pC1, pOa, pOb
+    },
+    sub: {
+      S0: { nHr: P(...nC4, 27, 330), Hh: toward(hNE, pO2, 27) },
+      S1: { nHr: P(...pC2, 27, 150), Hh: toward(pO2, hNE, 27) }
+    },
+    baseBonds: [
+      ['rHis', 'hCB', 1], ['hCB', 'hCG', 1], ['hCG', 'hND', 1], ['hND', 'hCE', 1], ['hCE', 'hNE', 2, HC], ['hNE', 'hCD', 1], ['hCD', 'hCG', 2, HC], ['hND', 'hHD', 1],
+      ['rAsp', 'dCB', 1], ['dCB', 'dCG', 1], ['dCG', 'dO1', 2], ['dCG', 'dO2', 1],
+      ['rR109', 'aN', 1], ['aN', 'aH', 1],
+      ['rR171', 'zNe', 1], ['zNe', 'zC', 1], ['zC', 'zN1', 1], ['zC', 'zN2', 1],
+      ['nN1', 'nR', 1], ['nC3', 'nAm', 1], ['nN1', 'nC2', 1], ['nC2', 'nC3', 2, NC], ['nC3', 'nC4', 1], ['nC4', 'nHs', 1],
+      ['pC2', 'pMe', 1], ['pC2', 'pC1', 1], ['pC1', 'pOa', 1], ['pC1', 'pOb', 2]
+    ],
+    subBonds: {
+      S0: [['nC4', 'nC5', 1], ['nC5', 'nC6', 2, NC], ['nC6', 'nN1', 1], ['nC4', 'nHr', 1], ['pC2', 'pO2', 2], ['hNE', 'Hh', 1]],
+      S1: [['nC4', 'nC5', 2, NC], ['nC5', 'nC6', 1], ['nC6', 'nN1', 2, NC], ['pC2', 'nHr', 1], ['pC2', 'pO2', 1], ['pO2', 'Hh', 1]]
+    },
+    hb: {
+      S0: [['dO2', 'hHD'], ['aH', 'pO2'], ['Hh', 'pO2'], ['zN1', 'pOb'], ['zN2', 'pOa']],
+      S1: [['dO2', 'hHD'], ['aH', 'pO2'], ['Hh', 'hNE'], ['zN1', 'pOb'], ['zN2', 'pOa']]
+    },
+    chg: {
+      S0: { dO2: ['−', 90], hNE: ['+', 280], pOa: ['−', 200], zC: ['+', 300] },
+      S1: { dO2: ['−', 90], nN1: ['+', 90], pOa: ['−', 200], zC: ['+', 300] }
+    },
+    siteHalos: [[['hNE', 'rHis'], 0, .4], [['aH', 'rR109'], .2, .6], [['zN1', 'zN2', 'rR171'], .4, .8], [['nHr', 'nN1'], .6, 1]],
+    doneHalos: { pO2: .4, nN1: .4 },
+    bb: { x: 225, y: 6, w: 530, h: 420 },
+    steps: [
+      { from: 'S0', to: 'S1', title: 'Hydride and proton transfer', short: 'Hydride transfer',
+        text: 'This illustrative stage groups NADH hydride transfer from C4 to the carbonyl carbon with proton donation by His193. The animation does not establish their physical timing.',
+        arrows: [
+          { from: { lp: 'nN1', dir: 95 }, to: { bond: ['nN1', 'nC6'] }, bend: -.9, say: 'The nicotinamide N1 lone pair moves into the ring, forming N1=C6.' },
+          { from: { bond: ['nC5', 'nC6'] }, to: { bond: ['nC4', 'nC5'] }, bend: -.8, say: 'The C5=C6 π electrons shift to form C4=C5.' },
+          { from: { bond: ['nC4', 'nHr'] }, to: { atom: 'pC2' }, bend: -.35, say: 'The C4–H bond electrons carry the hydride to the pyruvate carbonyl carbon.' },
+          { from: { bond: ['pC2', 'pO2'] }, to: { bond: ['pO2', 'Hh'] }, bend: .6, say: 'The C=O π electrons move to oxygen, which takes the His193 proton.' },
+          { from: { bond: ['hNE', 'Hh'] }, to: { atom: 'hNE' }, bend: .95, say: 'The N–H bond of His193 returns its electrons to Nε2.' }
+        ] }
+    ]
+  };
+})();
+
+const MECHS = [CHYMO, TIM, LDH];
+
+/* Precompute positions, bonds, neighbours and role groups for every state */
+function prep(M) {
+  M.states = Object.keys(M.sub);
+  M.POS = {}; M.BONDS = {}; M.HBS = {}; M.NB = {}; M.GRP = {};
+  for (const s of M.states) {
+    M.POS[s] = Object.assign({}, M.base, M.sub[s]);
+    M.BONDS[s] = {}; M.NB[s] = {};
+    for (const b of M.baseBonds.concat(M.subBonds[s])) {
+      M.BONDS[s][key2(b[0], b[1])] = b;
+      (M.NB[s][b[0]] = M.NB[s][b[0]] || []).push(b[1]);
+      (M.NB[s][b[1]] = M.NB[s][b[1]] || []).push(b[0]);
+    }
+    M.HBS[s] = new Set(M.hb[s].map(h => key2(h[0], h[1])));
+    const g = {};
+    for (const id in M.atoms) if (!M.atoms[id].auto) g[id] = M.atoms[id].g;
+    for (const id in M.atoms) {
+      const a = M.atoms[id]; if (!a.auto || a.k === 'H') continue;
+      const n = (M.NB[s][id] || []).find(x => !M.atoms[x].auto); g[id] = n ? g[n] : a.g;
+    }
+    for (const id in M.atoms) {
+      const a = M.atoms[id]; if (!a.auto || a.k !== 'H') continue;
+      const n = (M.NB[s][id] || []).find(x => M.atoms[x].k !== 'H'); g[id] = n && g[n] ? g[n] : a.g;
+    }
+    M.GRP[s] = g;
+  }
+  M.groups = ['sub', 'enz', 'cof', 'wat'].filter(gr => Object.values(M.atoms).some(a => a.g === gr));
+}
+MECHS.forEach(prep);
+const bondOrder = (M, s, a, b) => { const x = M.BONDS[s][key2(a, b)]; return x ? x[2] : 0; };
+const bondRing = (M, s, a, b) => { const x = M.BONDS[s][key2(a, b)]; return x && x[3] ? x[3] : null; };
+
+/* Map a step's local progress u (0..1) to drawing parameters */
+function stepParams(M, k, u) {
+  const st = M.steps[k], pre = !!st.pre, n = st.arrows.length;
+  const a0 = pre ? .26 : .06, a1 = pre ? .64 : .6, m0 = pre ? .72 : .7, m1 = .94;
+  const a = seg(u, a0, a1);
+  const span = n > 1 ? Math.min(.45, 1.6 / n) : 1, stag = n > 1 ? (1 - span) / (n - 1) : 0;
+  const q = st.arrows.map((_, i) => seg(a, stag * i, stag * i + span));
+  if (pre && u < .24) return { A: st.pre, B: st.from, m: ease(seg(u, .02, .22)), step: k, q: q.map(() => 0), arrowAlpha: 1, lpAlpha: seg(u, .14, .24), exit: st.exit || [0, 0], enter: st.enter || [0, 0] };
+  return { A: st.from, B: st.to, m: ease(seg(u, m0, m1)), step: k, q, arrowAlpha: 1 - seg(u, m0, m0 + .1), lpAlpha: 1 };
+}
+
+/* Translucent pocket drawn under the mechanism: the cavity around substrate,
+   water and cofactor, and the enzyme motifs that line its walls. */
+function pocketImage(M) {
+  if (M.pocket) return M.pocket;
+  const bb = M.bb, S = 2, W = Math.ceil(bb.w / S), H = Math.ceil(bb.h / S);
+  const fs = new Float32Array(W * H), fe = new Float32Array(W * H);
+  const splat = (arr, x, y, sig, amp) => {
+    const ci = (x - bb.x) / S, cj = (y - bb.y) / S, R = Math.ceil(3 * sig / S);
+    for (let j = Math.max(0, Math.floor(cj - R)); j <= Math.min(H - 1, Math.ceil(cj + R)); j++)
+      for (let i = Math.max(0, Math.floor(ci - R)); i <= Math.min(W - 1, Math.ceil(ci + R)); i++) {
+        const dx = (i - ci) * S, dy = (j - cj) * S;
+        arr[j * W + i] += amp * Math.exp(-(dx * dx + dy * dy) / (2 * sig * sig));
+      }
+  };
+  const seen = new Set();
+  for (const s of M.states) for (const id in M.POS[s]) {
+    const a = M.atoms[id]; if (!a || a.k === 'res') continue;
+    const p = M.POS[s][id], g = M.GRP[s][id];
+    const kk = id + ':' + Math.round(p[0] / 8) + ',' + Math.round(p[1] / 8);
+    if (seen.has(kk)) continue; seen.add(kk);
+    if (g === 'enz') splat(fe, p[0], p[1], 16, 1); else splat(fs, p[0], p[1], 23, .8);
+  }
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const cx = cv.getContext('2d'), img = cx.createImageData(W, H), d = img.data;
+  for (let k = 0; k < W * H; k++) {
+    const a = fs[k], e = fe[k];
+    const cav = smooth(seg(a, .3, .52)), depth = smooth(seg(a, .5, 1.9));
+    const aw = smooth(seg(e, .25, .9)) * .24 * (1 - cav * .7);
+    const ac = cav * (.12 + .2 * depth);
+    let r = 232, g = 118, b = 92, al = aw;
+    const cr = lerp(255, 246, depth), cg = lerp(222, 176, depth), cb = lerp(178, 112, depth);
+    const oa = ac + al * (1 - ac);
+    if (oa > 0) { r = (cr * ac + r * al * (1 - ac)) / oa; g = (cg * ac + g * al * (1 - ac)) / oa; b = (cb * ac + b * al * (1 - ac)) / oa; }
+    const rim = Math.exp(-Math.pow((a - .36) / .05, 2)) * .45 + Math.exp(-Math.pow((a - .85) / .035, 2)) * .16 + Math.exp(-Math.pow((a - 1.35) / .04, 2)) * .12;
+    const fa = rim + oa * (1 - rim);
+    if (fa > 0) { r = (255 * rim + r * oa * (1 - rim)) / fa; g = (232 * rim + g * oa * (1 - rim)) / fa; b = (190 * rim + b * oa * (1 - rim)) / fa; }
+    d[k * 4] = r; d[k * 4 + 1] = g; d[k * 4 + 2] = b; d[k * 4 + 3] = Math.round(clamp(fa) * 255);
+  }
+  cx.putImageData(img, 0, 0);
+  M.pocket = { href: cv.toDataURL(), x: bb.x, y: bb.y, w: W * S, h: H * S };
+  return M.pocket;
+}
+
+/* ---------------- Mechanism renderer ---------------- */
+const KIND = { res: [34, 10, 14.5], L: [30, 11, 16.5], C: [21, 11, 19], NH: [15, 11, 19], H: [8, 10, 16.5], O: [10.5, 11.5, 20], N: [10.5, 11.5, 20], R: [10, 11.5, 20] };
+class MechView {
+  constructor(root, M) {
+    this.M = M; this.root = root; root.replaceChildren();
+    const pk = pocketImage(M);
+    mk('image', { href: pk.href, x: pk.x, y: pk.y, width: pk.w, height: pk.h, preserveAspectRatio: 'none' }, root);
+    const L = this.L = {};
+    for (const n of ['halo', 'hb', 'glow', 'bond', 'charge', 'atom', 'arrow']) L[n] = mk('g', { class: 'L-' + n }, root);
+    this.atoms = {};
+    for (const id in M.atoms) {
+      const a = M.atoms[id], o = {};
+      if (a.t) {
+        o.halo = mk('circle', { r: a.k === 'res' ? 30 : 24, fill: 'url(#haloGrad)', opacity: 0 }, L.halo);
+        o.text = mk('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central', 'font-size': KIND[a.k][2] }, L.atom);
+        o.text.textContent = a.t;
+      }
+      this.atoms[id] = o;
+    }
+    this.bonds = {};
+    for (const s of M.states) for (const k in M.BONDS[s]) {
+      if (this.bonds[k]) continue;
+      const [a, b] = M.BONDS[s][k];
+      this.bonds[k] = { a, b, glow: mk('line', { class: 'bglow', opacity: 0, filter: 'url(#soft)' }, L.glow),
+        sa: mk('line', { class: 'bond' }, L.bond), sb: mk('line', { class: 'bond' }, L.bond), pa: mk('line', { class: 'bond' }, L.bond), pb: mk('line', { class: 'bond' }, L.bond) };
+    }
+    this.hbs = {};
+    for (const s of M.states) for (const h of M.hb[s]) { const k = key2(h[0], h[1]); if (!this.hbs[k]) this.hbs[k] = { a: h[0], b: h[1], el: mk('line', { class: 'hb' }, L.hb) }; }
+    this.charges = {};
+    for (const s of M.states) for (const id in M.chg[s]) {
+      if (this.charges[id]) continue;
+      const g = mk('g', { class: 'charge' }, L.charge);
+      mk('circle', { r: 7.5 }, g);
+      const t = mk('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, g);
+      this.charges[id] = { g, t };
+    }
+    this.arrows = M.steps.map(st => st.arrows.map((def, i) => {
+      const g = mk('g', { class: 'arrow', opacity: 0 }, L.arrow), o = { def, g };
+      o.glow = mk('path', { class: 'a-glow', filter: 'url(#soft)', opacity: .5 }, g);
+      o.path = mk('path', { class: 'a-path' }, g);
+      o.pulse = mk('path', { class: 'a-pulse', opacity: 0 }, g);
+      o.head = mk('path', { class: 'a-head', opacity: 0 }, g);
+      o.lp = [mk('circle', { class: 'lp', r: 2.7, opacity: 0 }, g), mk('circle', { class: 'lp', r: 2.7, opacity: 0 }, g)];
+      o.rip = [0, 1, 2].map(() => mk('circle', { class: 'ripple', opacity: 0 }, g));
+      o.eg = mk('circle', { r: 15, fill: 'url(#eGlow)', opacity: 0 }, g);
+      o.e = [mk('circle', { class: 'e', r: 2.9, opacity: 0 }, g), mk('circle', { class: 'e', r: 2.9, opacity: 0 }, g)];
+      o.badge = mk('g', { class: 'badge', opacity: 0 }, g);
+      mk('circle', { r: 9.5 }, o.badge);
+      const bt = mk('text', { 'text-anchor': 'middle', 'dominant-baseline': 'central' }, o.badge);
+      bt.textContent = String(i + 1);
+      return o;
+    }));
+  }
+  cls(el, c) { if (el._c !== c) { el.setAttribute('class', c); el._c = c; } }
+  trim(p, q, id) {
+    const a = this.M.atoms[id];
+    if (!a.t) return p;
+    const [rx, ry] = KIND[a.k];
+    const dx = q[0] - p[0], dy = q[1] - p[1], L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+    const t = Math.min(L * .45, 1 / Math.sqrt((ux / rx) ** 2 + (uy / ry) ** 2));
+    return [p[0] + ux * t, p[1] + uy * t];
+  }
+  line(e, p, q, al) {
+    e.setAttribute('x1', f1(p[0])); e.setAttribute('y1', f1(p[1])); e.setAttribute('x2', f1(q[0])); e.setAttribute('y2', f1(q[1]));
+    e.setAttribute('opacity', op2(al));
+  }
+  frame(o) {
+    const M = this.M;
+    const { A, step = null, q = [], arrowAlpha = 1, lpAlpha = 1, time = 0, halos = {}, exit = [0, 0], enter = [0, 0] } = o;
+    const B = o.B || A, m = o.B ? (o.m || 0) : 0;
+    const PA = M.POS[A], PB = M.POS[B], GA = M.GRP[A], GB = M.GRP[B];
+    const pos = {}, op = {}, grp = {};
+    for (const id in M.atoms) {
+      const inA = id in PA, inB = id in PB;
+      if (inA && inB) { pos[id] = [lerp(PA[id][0], PB[id][0], m), lerp(PA[id][1], PB[id][1], m)]; op[id] = 1; }
+      else if (inA) { pos[id] = [PA[id][0] + exit[0] * m, PA[id][1] + exit[1] * m]; op[id] = 1 - smooth(m); }
+      else if (inB) { pos[id] = [PB[id][0] + enter[0] * (1 - m), PB[id][1] + enter[1] * (1 - m)]; op[id] = smooth(m); }
+      else { pos[id] = [0, 0]; op[id] = 0; }
+      grp[id] = (m < .5 ? (GA[id] || GB[id]) : (GB[id] || GA[id])) || M.atoms[id].g;
+    }
+    this.pos = pos;
+    const H = Object.assign({}, halos);
+    const lift = (id, v) => { if (M.atoms[id] && M.atoms[id].t) H[id] = Math.max(H[id] || 0, v); };
+    for (const id in M.atoms) {
+      const a = this.atoms[id]; if (!a.text) continue;
+      a.text.setAttribute('x', f1(pos[id][0])); a.text.setAttribute('y', f1(pos[id][1]));
+      a.text.setAttribute('opacity', op2(op[id]));
+      this.cls(a.text, `k-${M.atoms[id].k} g-${grp[id]}`);
+    }
+    for (const k in this.bonds) {
+      const b = this.bonds[k];
+      const oa = bondOrder(M, A, b.a, b.b), ob = bondOrder(M, B, b.a, b.b);
+      const vis = Math.min(op[b.a], op[b.b]);
+      if ((!oa && !ob) || vis <= 0) { for (const e of [b.sa, b.sb, b.pa, b.pb, b.glow]) e.setAttribute('opacity', 0); continue; }
+      const sA = lerp(oa >= 1 ? 1 : 0, ob >= 1 ? 1 : 0, m) * vis, pA = lerp(oa >= 2 ? 1 : 0, ob >= 2 ? 1 : 0, m) * vis;
+      const t1 = this.trim(pos[b.a], pos[b.b], b.a), t2 = this.trim(pos[b.b], pos[b.a], b.b);
+      const dx = t2[0] - t1[0], dy = t2[1] - t1[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+      const mid = [(t1[0] + t2[0]) / 2, (t1[1] + t2[1]) / 2];
+      this.cls(b.sa, 'bond g-' + grp[b.a]); this.cls(b.pa, 'bond g-' + grp[b.a]);
+      this.cls(b.sb, 'bond g-' + grp[b.b]); this.cls(b.pb, 'bond g-' + grp[b.b]);
+      const ring = bondRing(M, ob >= 2 ? B : A, b.a, b.b) || bondRing(M, A, b.a, b.b);
+      if (ring) {
+        const sgn = ((ring[0] - mid[0]) * nx + (ring[1] - mid[1]) * ny) > 0 ? 1 : -1, off = 6.2 * sgn, sh = .18;
+        this.line(b.sa, t1, mid, sA); this.line(b.sb, mid, t2, sA);
+        const p1 = [t1[0] + dx * sh + nx * off, t1[1] + dy * sh + ny * off], p2 = [t2[0] - dx * sh + nx * off, t2[1] - dy * sh + ny * off], pm = [mid[0] + nx * off, mid[1] + ny * off];
+        this.line(b.pa, p1, pm, pA); this.line(b.pb, pm, p2, pA);
+      } else {
+        const d = 3.3, so = -d * (pA / Math.max(vis, .001));
+        const o1 = [nx * so, ny * so], o2 = [nx * d, ny * d];
+        this.line(b.sa, [t1[0] + o1[0], t1[1] + o1[1]], [mid[0] + o1[0], mid[1] + o1[1]], sA);
+        this.line(b.sb, [mid[0] + o1[0], mid[1] + o1[1]], [t2[0] + o1[0], t2[1] + o1[1]], sA);
+        this.line(b.pa, [t1[0] + o2[0], t1[1] + o2[1]], [mid[0] + o2[0], mid[1] + o2[1]], pA);
+        this.line(b.pb, [mid[0] + o2[0], mid[1] + o2[1]], [t2[0] + o2[0], t2[1] + o2[1]], pA);
+      }
+      const forming = ob > oa ? bell(m) : 0;
+      if (forming > .01) { this.line(b.glow, t1, t2, forming * .9); lift(b.a, forming * .8); lift(b.b, forming * .8); }
+      else b.glow.setAttribute('opacity', 0);
+    }
+    for (const k in this.hbs) {
+      const h = this.hbs[k];
+      const al = lerp(M.HBS[A].has(k) ? 1 : 0, M.HBS[B].has(k) ? 1 : 0, m) * Math.min(op[h.a], op[h.b]);
+      if (al <= .01) { h.el.setAttribute('opacity', 0); continue; }
+      const t1 = this.trim(pos[h.a], pos[h.b], h.a), t2 = this.trim(pos[h.b], pos[h.a], h.b);
+      const dx = t2[0] - t1[0], dy = t2[1] - t1[1], L = Math.hypot(dx, dy) || 1;
+      this.line(h.el, [t1[0] + dx / L * 4, t1[1] + dy / L * 4], [t2[0] - dx / L * 4, t2[1] - dy / L * 4], al);
+    }
+    for (const id in this.charges) {
+      const ca = M.chg[A][id], cb = M.chg[B][id], c = this.charges[id];
+      const al = lerp(ca ? 1 : 0, cb ? 1 : 0, m) * op[id];
+      if (al <= .01) { c.g.setAttribute('opacity', 0); continue; }
+      const cur = (m >= .5 && cb) ? cb : (ca || cb);
+      const kind = M.atoms[id].k, dist = Math.max(17.5, (KIND[kind] ? KIND[kind][1] : 0) + 8);
+      const p = P(pos[id][0], pos[id][1], dist, cur[1]);
+      c.g.setAttribute('transform', `translate(${f1(p[0])},${f1(p[1])})`);
+      c.g.setAttribute('opacity', op2(al));
+      this.cls(c.g, 'charge g-' + grp[id]);
+      if (c.t.textContent !== cur[0]) c.t.textContent = cur[0];
+    }
+    this.arrows.forEach((list, si) => list.forEach((ar, i) => {
+      if (si !== step) { ar.g.setAttribute('opacity', 0); return; }
+      this.drawArrow(ar, q[i] || 0, arrowAlpha, lpAlpha, time, i, lift);
+    }));
+    if (step !== null && this.arrows[step]) {
+      const list = this.arrows[step];
+      for (let it = 0; it < 4; it++) for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
+        const a = list[i].bpos, b = list[j].bpos, dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) || .01;
+        if (d < 24) { const push = (24 - d) / 2 + .5; a[0] -= dx / d * push; a[1] -= dy / d * push; b[0] += dx / d * push; b[1] += dy / d * push; }
+      }
+      list.forEach(ar => ar.badge.setAttribute('transform', `translate(${f1(ar.bpos[0])},${f1(ar.bpos[1])})`));
+    }
+    for (const id in this.atoms) {
+      const a = this.atoms[id]; if (!a.halo) continue;
+      a.halo.setAttribute('cx', f1(pos[id][0])); a.halo.setAttribute('cy', f1(pos[id][1]));
+      a.halo.setAttribute('opacity', op2((H[id] || 0) * op[id]));
+    }
+  }
+  geom(def) {
+    const pos = this.pos, mid = (a, b) => [(pos[a][0] + pos[b][0]) / 2, (pos[a][1] + pos[b][1]) / 2];
+    const s0 = def.from.lp ? P(...pos[def.from.lp], 17, def.from.dir) : mid(...def.from.bond);
+    const e0 = def.to.atom ? pos[def.to.atom] : mid(...def.to.bond);
+    const dx = e0[0] - s0[0], dy = e0[1] - s0[1], L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    const reach = Math.max(L, def.to.atom && def.from.bond ? 34 : 46) * def.bend;
+    const c = [(s0[0] + e0[0]) / 2 + nx * reach, (s0[1] + e0[1]) / 2 + ny * reach];
+    const tw = (p, d) => { const vx = c[0] - p[0], vy = c[1] - p[1], l = Math.hypot(vx, vy) || 1; return [p[0] + vx / l * d, p[1] + vy / l * d]; };
+    const toAtomLabel = def.to.atom && this.M.atoms[def.to.atom].t;
+    return { s: tw(s0, def.from.lp ? 3 : 5), c, e: def.to.atom ? tw(e0, toAtomLabel ? 14.5 : 8) : tw(e0, 4), lp: def.from.lp ? P(...pos[def.from.lp], 14, def.from.dir) : null };
+  }
+  drawArrow(ar, q, alpha, lpAlpha, time, idx, lift) {
+    const { s, c, e, lp } = this.geom(ar.def);
+    const tx = e[0] - c[0], ty = e[1] - c[1], tl = Math.hypot(tx, ty) || 1, ux = tx / tl, uy = ty / tl;
+    const end = [e[0] - ux * 6, e[1] - uy * 6];
+    const d = `M${f1(s[0])} ${f1(s[1])}Q${f1(c[0])} ${f1(c[1])} ${f1(end[0])} ${f1(end[1])}`;
+    const bz = t => [(1 - t) * (1 - t) * s[0] + 2 * (1 - t) * t * c[0] + t * t * end[0], (1 - t) * (1 - t) * s[1] + 2 * (1 - t) * t * c[1] + t * t * end[1]];
+    let len = 0, prev = s;
+    for (let i = 1; i <= 16; i++) { const p = bz(i / 16); len += Math.hypot(p[0] - prev[0], p[1] - prev[1]); prev = p; }
+    ar.g.setAttribute('opacity', op2(alpha));
+    ar.path.style.visibility = ar.glow.style.visibility = q > .001 ? 'visible' : 'hidden';
+    for (const p of [ar.path, ar.glow]) { p.setAttribute('d', d); p.setAttribute('stroke-dasharray', `${f1(len)} ${f1(len + 20)}`); p.setAttribute('stroke-dashoffset', f1(len * (1 - q))); }
+    ar.glow.setAttribute('opacity', op2(.35 + .4 * bell(q)));
+    const hl = 12.5, hw = 6.2, nx = -uy, ny = ux, back = [e[0] - ux * hl, e[1] - uy * hl], notch = [e[0] - ux * hl * .62, e[1] - uy * hl * .62];
+    ar.head.setAttribute('d', `M${f1(back[0] + nx * hw)} ${f1(back[1] + ny * hw)}L${f1(e[0])} ${f1(e[1])}L${f1(back[0] - nx * hw)} ${f1(back[1] - ny * hw)}L${f1(notch[0])} ${f1(notch[1])}Z`);
+    ar.head.setAttribute('opacity', op2(seg(q, .9, 1)));
+    if (lp) {
+      const a = (ar.def.from.dir + 90) * Math.PI / 180, px = Math.cos(a) * 3.6, py = -Math.sin(a) * 3.6;
+      ar.lp[0].setAttribute('cx', f1(lp[0] + px)); ar.lp[0].setAttribute('cy', f1(lp[1] + py));
+      ar.lp[1].setAttribute('cx', f1(lp[0] - px)); ar.lp[1].setAttribute('cy', f1(lp[1] - py));
+      ar.lp.forEach(c2 => c2.setAttribute('opacity', op2(lpAlpha * (1 - seg(q, .02, .3)))));
+    }
+    const ev = q > 0 && q < 1 ? Math.min(1, q * 8, (1 - q) * 8) : 0;
+    const pt = bz(clamp(q)), pt2 = bz(clamp(q + .02));
+    const vx = pt2[0] - pt[0], vy = pt2[1] - pt[1], vl = Math.hypot(vx, vy) || 1, pnx = -vy / vl * 3.4, pny = vx / vl * 3.4;
+    ar.e[0].setAttribute('cx', f1(pt[0] + pnx)); ar.e[0].setAttribute('cy', f1(pt[1] + pny));
+    ar.e[1].setAttribute('cx', f1(pt[0] - pnx)); ar.e[1].setAttribute('cy', f1(pt[1] - pny));
+    ar.eg.setAttribute('cx', f1(pt[0])); ar.eg.setAttribute('cy', f1(pt[1]));
+    ar.e.forEach(c2 => c2.setAttribute('opacity', op2(ev))); ar.eg.setAttribute('opacity', op2(ev));
+    const src = ar.def.from.lp ? [ar.def.from.lp] : ar.def.from.bond, dst = ar.def.to.atom ? [ar.def.to.atom] : ar.def.to.bond;
+    src.forEach(id => lift(id, bell(seg(q, 0, .7)) * .9 * alpha));
+    dst.forEach(id => lift(id, (q >= 1 ? .5 : bell(seg(q, .55, 1)) * .95) * alpha));
+    const burst = seg(q, .82, 1), r0 = ar.rip[0];
+    r0.setAttribute('cx', f1(e[0])); r0.setAttribute('cy', f1(e[1])); r0.setAttribute('r', f1(4 + 26 * burst));
+    r0.setAttribute('opacity', op2(burst > 0 && burst < 1 ? (1 - burst) * .9 : 0));
+    for (let j = 1; j < 3; j++) {
+      const k = reduceMotion ? 0 : ((time / 1700 + idx * .31 + j * .5) % 1), r = ar.rip[j];
+      r.setAttribute('cx', f1(e[0])); r.setAttribute('cy', f1(e[1])); r.setAttribute('r', f1(6 + 22 * k));
+      r.setAttribute('opacity', op2(q >= 1 && !reduceMotion ? (1 - k) * .55 : 0));
+    }
+    if (q >= 1 && !reduceMotion) {
+      const pl = 14, cyc = len + pl + 50, off = len + pl - ((time * .16 + idx * 37) % cyc);
+      ar.pulse.setAttribute('d', d); ar.pulse.setAttribute('stroke-dasharray', `${pl} ${f1(len + 80)}`); ar.pulse.setAttribute('stroke-dashoffset', f1(off)); ar.pulse.setAttribute('opacity', .85);
+    } else ar.pulse.setAttribute('opacity', 0);
+    const apex = bz(.5), mid = [(s[0] + end[0]) / 2, (s[1] + end[1]) / 2];
+    const ox = apex[0] - mid[0], oy = apex[1] - mid[1], ol = Math.hypot(ox, oy) || 1;
+    ar.bpos = [apex[0] + ox / ol * 15, apex[1] + oy / ol * 15];
+    ar.badge.setAttribute('opacity', op2(seg(q, .45, .75)));
+  }
+}
+
+/* ---------------- Illustrative 3D protein ribbons ---------------- */
+const vadd = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]], vsub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]], vmul = (a, s) => [a[0] * s, a[1] * s, a[2] * s];
+const vdot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2], vlen = a => Math.hypot(a[0], a[1], a[2]), vnorm = a => vmul(a, 1 / (vlen(a) || 1));
+const vcross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const vlerp = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+function basis(ax) { const a = vnorm(ax), t = Math.abs(a[1]) < .9 ? [0, 1, 0] : [1, 0, 0], u = vnorm(vcross(a, t)); return [a, u, vcross(a, u)]; }
+function rand(seed) { let s = seed; return () => ((s = s * 16807 % 2147483647) - 1) / 2147483646; }
+
+function buildFold(M, detail = 1) {
+  // Procedural, illustrative protein ribbons; these are not PDB coordinates.
+  const random = rand(M.seed * 7919 + 13), vertices = [], normals = [], faces = [], seeds = [], elements = [];
+  const strandWidth = 2.7, helixWidth = 2.8, loopWidth = .6, ribbonThickness = .14;
+  const profile = [[1, 0], [.96, 1], [-.96, 1], [-1, 0], [-.96, -1], [.96, -1]];
+  const palette = [[236, 202, 131], [229, 161, 90], [205, 112, 80], [165, 78, 76]];
+  const mixColor = (a, b, t) => a.map((value, i) => Math.round(lerp(value, b[i], t)));
+  const colorAt = t => { const q = clamp(t) * 3, i = Math.min(2, Math.floor(q)); return mixColor(palette[i], palette[i + 1], q - i); };
+  const face = (ids, color, kind, tone = 1, contourMask = 0) => {
+    const a = vertices[ids[0]], b = vertices[ids[1]], c = vertices[ids[2]];
+    const normal = vcross(vsub(b, a), vsub(c, a));
+    if (vlen(normal) > 1e-7) {
+      const center = [0, 0, 0];
+      for (const id of ids) { center[0] += vertices[id][0]; center[1] += vertices[id][1]; center[2] += vertices[id][2]; }
+      center[0] /= ids.length; center[1] /= ids.length; center[2] /= ids.length;
+      faces.push({ id: faces.length, ids, color, kind, tone, contourMask, normal: vnorm(normal), center });
+    }
+  };
+  const vertex = (p, normal) => { vertices.push(p); normals.push(vnorm(normal)); return vertices.length - 1; };
+  const tangentAt = (path, i) => vnorm(vsub(path[Math.min(path.length - 1, i + 1)], path[Math.max(0, i - 1)]));
+  const cubic = (a, b, c, d, n) => Array.from({ length: n + 1 }, (_, i) => {
+    const t = i / n, u = 1 - t;
+    return [0, 1, 2].map(k => u * u * u * a[k] + 3 * u * u * t * b[k] + 3 * u * t * t * c[k] + t * t * t * d[k]);
+  });
+  function ribbon(path, widths, widthDirection, color, kind, thickness) {
+    // Broad flat faces and very slim chamfered edges keep the ribbon light and legible.
+    const sides = 6, rings = []; let previousWidth = null, seedDistance = Infinity;
+    path.forEach((p, i) => {
+      const tangent = tangentAt(path, i), proposed = widthDirection(p, tangent, i);
+      let width = vnorm(vsub(proposed, vmul(tangent, vdot(proposed, tangent))));
+      if (vlen(width) < .5) width = basis(tangent)[1];
+      if (previousWidth && vdot(width, previousWidth) < 0) width = vmul(width, -1);
+      previousWidth = width;
+      const normal = vnorm(vcross(tangent, width)), w = Math.max(.008, widths[i] * .5);
+      const h = Math.max(.025, thickness * .5);
+      const ring = [];
+      for (let j = 0; j < sides; j++) {
+        const [c, s] = profile[j];
+        // Adjacent longitudinal segments share the same profile vertices.
+        const vertexNormal = vnorm(vadd(vmul(width, c / w), vmul(normal, s / h)));
+        ring.push(vertex(vadd(p, vadd(vmul(width, c * w), vmul(normal, s * h))), vertexNormal));
+      }
+      rings.push(ring);
+      if (i) seedDistance += vlen(vsub(p, path[i - 1]));
+      if (seedDistance >= (kind === 'helix' ? 2.35 : 1.7)) { seeds.push({ p, normal, color }); seedDistance = 0; }
+    });
+    for (let i = 0; i < rings.length - 1; i++) {
+      const a = rings[i], b = rings[i + 1];
+      for (let j = 0; j < sides; j++) {
+        const next = (j + 1) % sides;
+        // A single flat tone covers each full side; only the reverse is darker.
+        const tone = j < 3 ? 1 : .68;
+        const contours = ((next === 0 || next === 3) ? 2 : 0) | ((j === 0 || j === 3) ? 8 : 0);
+        face([a[j], a[next], b[next], b[j]], color, kind, tone, contours);
+      }
+    }
+    // Small end caps are separate vertices so their normals do not flatten the ribbon surface.
+    const firstTangent = vmul(tangentAt(path, 0), -1), lastTangent = tangentAt(path, path.length - 1);
+    const first = rings[0].map(id => vertex(vertices[id], firstTangent));
+    const last = rings[rings.length - 1].map(id => vertex(vertices[id], lastTangent));
+    face(first.slice().reverse(), color, kind, .84); face(last, color, kind, .84);
+    elements.push({ kind, points: path.length });
+  }
+  function connectorRibbon(path, color) {
+    const sides = 6, rings = []; let width = null;
+    path.forEach((p, i) => {
+      const tangent = tangentAt(path, i);
+      width = width ? vnorm(vsub(width, vmul(tangent, vdot(width, tangent)))) : basis(tangent)[1];
+      if (vlen(width) < .5) width = basis(tangent)[1];
+      const normal = vnorm(vcross(tangent, width)), ring = [], w = loopWidth * .5, h = ribbonThickness * .5;
+      for (let j = 0; j < sides; j++) {
+        const [c, s] = profile[j];
+        const direction = vnorm(vadd(vmul(width, c / w), vmul(normal, s / h)));
+        ring.push(vertex(vadd(p, vadd(vmul(width, c * w), vmul(normal, s * h))), direction));
+      }
+      rings.push(ring);
+    });
+    for (let i = 0; i < rings.length - 1; i++) for (let j = 0; j < sides; j++) {
+      const next = (j + 1) % sides;
+      const tone = j < 3 ? 1 : .68;
+      const contours = ((next === 0 || next === 3) ? 2 : 0) | ((j === 0 || j === 3) ? 8 : 0);
+      face([rings[i][j], rings[i][next], rings[i + 1][next], rings[i + 1][j]], color, 'loop', tone, contours);
+    }
+  }
+  let previous = null, previousColor = palette[0];
+  function join(to, color, firstOffset = [0, 3, 0], lastOffset = [0, 3, 0]) {
+    if (previous && vlen(vsub(to, previous)) > .15) {
+      const n = Math.round(Math.min(30, Math.max(16, Math.ceil(vlen(vsub(to, previous)) * 1.4))) * detail);
+      const loopColor = mixColor([155, 104, 68], mixColor(previousColor, color, .5), .24);
+      connectorRibbon(cubic(previous, vadd(previous, firstOffset), vadd(to, lastOffset), to, n), loopColor);
+    }
+    previous = to; previousColor = color;
+  }
+  function strand(pointAt, normalAt, color, offsets) {
+    // Broad constant-width strands stay readable without oversized arrowheads.
+    const n = Math.max(18, Math.round(30 * detail));
+    const path = Array.from({ length: n + 1 }, (_, i) => pointAt(i / n));
+    const widths = path.map(() => strandWidth);
+    join(path[0], color, offsets[0], offsets[1]);
+    ribbon(path, widths, (p, tangent) => vcross(normalAt(p), tangent), color, 'ribbon', ribbonThickness);
+    previous = path[path.length - 1]; previousColor = color;
+  }
+  function helix(start, end, color, phase = .35, offsets = [[0, 4, 0], [0, 3, 0]]) {
+    const axis = vsub(end, start), length = vlen(axis), [a, u, v] = basis(axis);
+    const turns = length / 4.9, n = Math.max(32, Math.ceil(turns * 26 * detail));
+    const path = Array.from({ length: n + 1 }, (_, i) => {
+      const t = i / n, angle = phase + t * turns * Math.PI * 2;
+      return vadd(vlerp(start, end, t), vadd(vmul(u, Math.cos(angle) * 2.35), vmul(v, Math.sin(angle) * 2.35)));
+    });
+    const widths = path.map(() => helixWidth);
+    join(path[0], color, offsets[0], offsets[1]);
+    ribbon(path, widths, () => a, color, 'helix', ribbonThickness);
+    previous = path[path.length - 1]; previousColor = color;
+  }
+  let site, motifs, ligs = [], pose;
+  if (M.fold === 'barrels') {
+    const domains = [
+      { center: [-10.5, .8, -1], axis: [.17, 1, .18], phase: .25 },
+      { center: [10.7, -.8, -2], axis: [-.21, 1, -.20], phase: 2.05 }
+    ];
+    previous = [-21, 13, 3];
+    domains.forEach((domain, di) => {
+      const [a, u, v] = basis(domain.axis);
+      for (let i = 0; i < 6; i++) {
+        const angle0 = domain.phase + i * Math.PI / 3, length = 17.4 + random() * 1.8;
+        const pointAt = q => {
+          const t = i % 2 ? 1 - q : q, angle = angle0 + .84 * (t - .5);
+          return vadd(vadd(domain.center, vmul(a, (t - .5) * length)), vadd(vmul(u, Math.cos(angle) * 6.65), vmul(v, Math.sin(angle) * 6.65)));
+        };
+        const normalAt = p => { const d = vsub(p, domain.center); return vnorm(vsub(d, vmul(a, vdot(d, a)))); };
+        const side = i % 2 ? 1 : -1;
+        const offsets = i === 0 && di === 1 ? [[5, -6, -7], [-5, -6, -7]]
+          : [vmul(a, side * 4.4), vmul(a, side * 4.4)];
+        strand(pointAt, normalAt, colorAt((di * 6 + i) / 13), offsets);
+      }
+    });
+    helix([14, -15, 6], [22, -4, 9], colorAt(.92), .45, [[3, -4, 2], [-3, -3, 0]]);
+    join([17, 6, 10], colorAt(1), [1, 4, 1], [2, -3, 0]);
+    site = [0, 1.5, 7]; motifs = [[3.4, .2, 5.2], [-2.8, 3, 5.4], [-5.2, 1.4, 2.4]];
+    ligs = [{ g: 'sub', c: [.6, 1.3, 8.2], n: 9, spread: [2.1, 1.2, 1.1] }]; pose = [2.72, -.25];
+  } else if (M.fold === 'tim') {
+    for (let i = 0; i < 8; i++) {
+      const angle0 = i * Math.PI / 4;
+      const pointAt = t => { const angle = angle0 + .38 * (t - .5); return [6.8 * Math.cos(angle), -7.8 + 15.6 * t, 6.8 * Math.sin(angle)]; };
+      strand(pointAt, p => vnorm([p[0], 0, p[2]]), mixColor(palette[1], palette[0], (i % 3) * .16), [[0, -4, 0], [0, -4, 0]]);
+      const angle = angle0 + Math.PI / 8;
+      helix([14.3 * Math.cos(angle), 8.8, 14.3 * Math.sin(angle)], [14.3 * Math.cos(angle + .2), -8.8, 14.3 * Math.sin(angle + .2)],
+        colorAt(i / 7), i * .37, [[0, 4.5, 0], [0, 3, 0]]);
+    }
+    site = [0, 9.2, 0]; motifs = [[5 * Math.cos(.2), 8.6, 5 * Math.sin(.2)], [5 * Math.cos(2.6), 8.8, 5 * Math.sin(2.6)], [5 * Math.cos(4.3), 8.4, 5 * Math.sin(4.3)]];
+    ligs = [{ g: 'sub', c: [0, 10.2, 0], n: 8, spread: [2, .8, 2] }]; pose = [2.62, -.44];
+  } else {
+    const xs = [0, -4.8, -9.6, 4.8, 9.6, 14.4], helices = [[-2.4, 9.5], [-7.2, 9.5], [2.4, -9.5], [7.2, -9.5], [12, -9.5]];
+    xs.forEach((x, i) => {
+      strand(t => { const y = -8 + t * 16; return [x + Math.sin(t * Math.PI) * .45, y, .035 * x * y]; },
+        () => vnorm([-.12 * x / 10, 0, 1]), mixColor(palette[1], palette[0], i * .09), [[0, -4, 0], [0, -4, 0]]);
+      if (i < helices.length) {
+        const [hx, hz] = helices[i];
+        helix([hx, 8.7, hz], [hx + 1, -8.7, hz], colorAt(i / 6), i * .32, [[0, 4, hz * .16], [0, 3, 0]]);
+      }
+    });
+    helix([15, 14, -6], [6, 21, -8], colorAt(.80), .35, [[2, 4, -2], [0, -3, 0]]);
+    helix([-2, 18, -6], [-11, 12, -4], colorAt(.96), .7, [[-2, 2, 0], [2, 0, 0]]);
+    join([11, 17, 10], colorAt(.9), [4, 6, 8], [-2, 3, 2]);
+    join([16, 10, 2], colorAt(.95), [3, 0, 2], [0, 3, 0]);
+    site = [5, 10.5, 5]; motifs = [[8.8, 13.6, 7.2], [10.4, 9, 3], [4, 14.8, 8.6], [11.8, 14.2, 9.2]];
+    ligs = [{ g: 'cof', a: [-9, 8.6, 3.4], b: [3, 10, 4.4], n: 12, spread: [.6, .6, .6] }, { g: 'sub', c: [6.6, 11.2, 5.8], n: 6, spread: [1.1, .8, .8] }]; pose = [2.78, -.35];
+  }
+  // A visible golden point cloud follows the molecular envelope around the ribbons.
+  const pts = [], jitter = amount => [(random() - .5) * 2 * amount, (random() - .5) * 2 * amount, (random() - .5) * 2 * amount];
+  seeds.forEach(seed => {
+    for (let i = 0; i < 3; i++) {
+      const p = vadd(seed.p, vadd(vmul(seed.normal, .8 + random() * 2), jitter(1.05)));
+      if (vlen(vsub(p, site)) > 4.8) pts.push({ p, r: .65 + random() * .24, a: .36, rgb: mixColor(seed.color, [255, 219, 158], .35).join(',') });
+    }
+  });
+  const motifPts = motifs.map((p, i) => ({ p, label: M.motifs3d[i] }));
+  motifPts.forEach(m => pts.push({ p: m.p, r: .68, a: .90, rgb: '248,181,129', motif: true }));
+  const ligLabels = [];
+  ligs.forEach((ligand, i) => {
+    const rgb = ligand.g === 'cof' ? '242,199,112' : '247,232,192', center = ligand.c || vlerp(ligand.a, ligand.b, .5);
+    for (let j = 0; j < ligand.n; j++) {
+      const base = ligand.c || vlerp(ligand.a, ligand.b, j / Math.max(1, ligand.n - 1));
+      pts.push({ p: vadd(base, ligand.spread.map(s => (random() - .5) * 2 * s)), r: .65, a: .85, rgb, lig: true });
+    }
+    ligLabels.push({ p: center, label: M.ligands3d[i][1], rgb });
+  });
+  let centroid = [0, 0, 0]; seeds.forEach(seed => { centroid = vadd(centroid, seed.p); }); centroid = vmul(centroid, 1 / seeds.length);
+  const distances = vertices.map(p => vlen(vsub(p, centroid))).sort((a, b) => a - b);
+  const radius = distances[Math.floor(distances.length * .965)] + .7;
+  // Shared mesh edges identify true silhouettes; only the two longitudinal ribbon edges are features.
+  // Transverse mesh seams are never outlined unless they form a visible silhouette.
+  const edgeMap = new Map();
+  for (const face of faces) for (let i = 0; i < face.ids.length; i++) {
+    const a = face.ids[i], b = face.ids[(i + 1) % face.ids.length], key = a < b ? a + ':' + b : b + ':' + a;
+    const feature = Boolean(face.contourMask & (1 << i)), shared = edgeMap.get(key);
+    if (shared) { shared.f1 = face.id; shared.feature ||= feature; }
+    else edgeMap.set(key, { a, b, f0: face.id, f1: -1, feature });
+  }
+  return { vertices, normals, faces, edges: [...edgeMap.values()], pts, site, centroid, radius, motifs: motifPts, ligLabels, pose, elements };
+}
+
+class Cloud {
+  constructor(canvas) {
+    this.cv = canvas; this.ctx = canvas.getContext('2d'); this.yaw = 2.72; this.pitch = -.25;
+    this.spin = reduceMotion ? 0 : .16; this.sprites = new Map(); this.siteScreen = [0, 0, 1];
+  }
+  sprite(rgb) {
+    if (this.sprites.has(rgb)) return this.sprites.get(rgb);
+    const canvas = document.createElement('canvas'); canvas.width = canvas.height = 40;
+    const ctx = canvas.getContext('2d'), gradient = ctx.createRadialGradient(20, 20, 0, 20, 20, 20);
+    gradient.addColorStop(0, `rgba(${rgb},1)`); gradient.addColorStop(.27, `rgba(${rgb},.68)`); gradient.addColorStop(1, `rgba(${rgb},0)`);
+    ctx.fillStyle = gradient; ctx.fillRect(0, 0, 40, 40); this.sprites.set(rgb, canvas); return canvas;
+  }
+  setFold(M) {
+    this.model = M;
+    this.detail = (this.W || this.cv.clientWidth || 1200) < 700 ? .72 : 1;
+    Object.assign(this, buildFold(M, this.detail));
+    const count = this.vertices.length;
+    this.positionBuffer = new Float64Array(count * 3);
+    this.cameraBuffer = new Float64Array(count * 3); this.screenBuffer = new Float64Array(count * 2);
+    this.vertices.forEach((point, i) => this.positionBuffer.set(point, i * 3));
+    this.colorCache = new Map(); this.paletteRGB = []; this.renderQueue = []; this.polygonBuffer = new Float64Array(48);
+    const colorIds = new Map();
+    this.facePackets = this.faces.map(face => {
+      const key = face.color.join(',');
+      if (!colorIds.has(key)) { colorIds.set(key, this.paletteRGB.length); this.paletteRGB.push(face.color); }
+      return { kind: 'face', face, colorId: colorIds.get(key), clipped: null, depth: 0, haze: 0, alpha: 1 };
+    });
+    this.frontFacing = new Uint8Array(this.faces.length);
+    this.edgePackets = this.edges.map(edge => ({ kind: 'edge', edge, p: new Float64Array(4), depth: 0, alpha: 1 }));
+    this.pts.forEach(point => { point.sp = this.sprite(point.rgb); }); this.glow = this.sprite('235,203,144');
+    this.pointPackets = this.pts.map(point => ({ kind: 'point', point, p: [0, 0, 0], size: 0, depth: 0, sprite: point.sp, alpha: 0 }));
+    if (this.foldId !== M.id) { [this.yaw, this.pitch] = this.pose; this.foldId = M.id; }
+    const d = vnorm(vsub(this.site, this.centroid));
+    this.yawT = Math.atan2(-d[0], d[2]) + Math.PI; this.pitchT = -Math.atan2(d[1], Math.hypot(d[0], d[2]));
+  }
+  size(W, H, dpr) {
+    this.W = W; this.H = H; this.dpr = dpr;
+    this.cv.width = Math.round(W * dpr); this.cv.height = Math.round(H * dpr);
+    // Narrow layouts need less tessellation; shared normals keep their lighting smooth.
+    const detail = W < 700 ? .72 : 1;
+    if (this.model && detail !== this.detail) this.setFold(this.model);
+  }
+  draw(o) {
+    const ctx = this.ctx, W = this.W, H = this.H;
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+    if (o.alpha <= .01 || !this.vertices) return;
+    const e = o.e, wrap = angle => Math.atan2(Math.sin(angle), Math.cos(angle));
+    const yaw = this.yaw + wrap(this.yawT - this.yaw) * e, pitch = lerp(this.pitch, this.pitchT, e);
+    const pivot = vlerp(this.centroid, this.site, e), D0 = this.radius * 4.2;
+    const D = Math.exp(lerp(Math.log(D0), Math.log(7.5), e)), F = o.s0 * D0;
+    const cx = lerp(o.c0[0], o.c1[0], e), cy = lerp(o.c0[1], o.c1[1], e);
+    const cosY = Math.cos(yaw), sinY = Math.sin(yaw), cosP = Math.cos(pitch), sinP = Math.sin(pitch);
+    const rotate = p => { const x = p[0] * cosY + p[2] * sinY, z = -p[0] * sinY + p[2] * cosY; return [x, p[1] * cosP - z * sinP, p[1] * sinP + z * cosP]; };
+    const camera = p => { const q = rotate(vsub(p, pivot)); q[2] += D; return q; };
+    const project = p => [cx + p[0] * F / p[2], cy - p[1] * F / p[2], p[2], p[3]];
+    const near = 2.2, bg = [43, 24, 21];
+    const fog = depth => clamp(1.13 - (depth - D) / (this.radius * 3.2), .48, 1);
+    const siteCamera = camera(this.site); this.siteScreen = project(siteCamera);
+    const drawList = this.renderQueue, surfaceAlpha = o.alpha * (1 - smooth(seg(e, .40, .88)));
+    drawList.length = 0;
+    // Clip polygons in camera space before perspective division: no inverted/giant faces at the near plane.
+    const clipNear = input => {
+      const output = [];
+      for (let i = 0; i < input.length; i++) {
+        const a = input[i], b = input[(i + 1) % input.length], insideA = a[2] >= near, insideB = b[2] >= near;
+        if (insideA) output.push(a);
+        if (insideA !== insideB) {
+          const t = (near - a[2]) / (b[2] - a[2]);
+          output.push(a.map((value, k) => lerp(value, b[k], t)));
+        }
+      }
+      return output;
+    };
+    if (surfaceAlpha > .015) {
+      const position = this.positionBuffer, cam = this.cameraBuffer, screen = this.screenBuffer;
+      for (let j = 0, k = 0; j < position.length; j += 3, k += 2) {
+        const x = position[j] - pivot[0], y = position[j + 1] - pivot[1], z = position[j + 2] - pivot[2];
+        const x1 = x * cosY + z * sinY, z1 = -x * sinY + z * cosY, y1 = y * cosP - z1 * sinP, depth = D + y * sinP + z1 * cosP;
+        cam[j] = x1; cam[j + 1] = y1; cam[j + 2] = depth;
+        const scale = F / Math.max(near, depth); screen[k] = cx + x1 * scale; screen[k + 1] = cy - y1 * scale;
+      }
+      const eyeX = pivot[0] + D * cosP * sinY, eyeY = pivot[1] - D * sinP, eyeZ = pivot[2] - D * cosP * cosY;
+      for (const packet of this.facePackets) {
+        packet.visible = false;
+        const face = packet.face, center = face.center, n = face.normal;
+        // World-space culling comes before any polygon allocation or projection work.
+        const facing = n[0] * (center[0] - eyeX) + n[1] * (center[1] - eyeY) + n[2] * (center[2] - eyeZ) < 0;
+        this.frontFacing[face.id] = facing ? 1 : 0;
+        if (!facing) continue;
+        let minDepth = Infinity, maxDepth = -Infinity, x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+        for (const id of face.ids) {
+          const z = cam[id * 3 + 2], x = screen[id * 2], y = screen[id * 2 + 1];
+          if (z < minDepth) minDepth = z; if (z > maxDepth) maxDepth = z;
+          if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+        }
+        if (maxDepth < near) continue;
+        packet.clipped = null;
+        if (minDepth < near) {
+          const polygon = clipNear(face.ids.map(id => [cam[id * 3], cam[id * 3 + 1], cam[id * 3 + 2]]));
+          if (polygon.length < 3) continue;
+          packet.clipped = polygon.map(project); x0 = y0 = Infinity; x1 = y1 = -Infinity;
+          for (const p of packet.clipped) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+        }
+        if (x1 < -3 || x0 > W + 3 || y1 < -3 || y0 > H + 3) continue;
+        packet.depth = D + (center[1] - pivot[1]) * sinP + (-(center[0] - pivot[0]) * sinY + (center[2] - pivot[2]) * cosY) * cosP;
+        packet.haze = 0;
+        packet.alpha = surfaceAlpha; packet.visible = true; drawList.push(packet);
+      }
+      // Contours participate in the same depth ordering as surfaces, so front ribbons cover rear edges.
+      // Near-plane clipping and opacity are shared with the ribbon surface during the active-site zoom.
+      for (const packet of this.edgePackets) {
+        const edge = packet.edge, front0 = this.frontFacing[edge.f0], front1 = edge.f1 < 0 ? 0 : this.frontFacing[edge.f1];
+        if (!(front0 || front1) || (!edge.feature && edge.f1 >= 0 && front0 === front1)) continue;
+        let ax = cam[edge.a * 3], ay = cam[edge.a * 3 + 1], az = cam[edge.a * 3 + 2];
+        let bx = cam[edge.b * 3], by = cam[edge.b * 3 + 1], bz = cam[edge.b * 3 + 2];
+        if (az < near && bz < near) continue;
+        if (az < near) { const t = (near - az) / (bz - az); ax = lerp(ax, bx, t); ay = lerp(ay, by, t); az = near; }
+        else if (bz < near) { const t = (near - bz) / (az - bz); bx = lerp(bx, ax, t); by = lerp(by, ay, t); bz = near; }
+        const p = packet.p; p[0] = cx + ax * F / az; p[1] = cy - ay * F / az; p[2] = cx + bx * F / bz; p[3] = cy - by * F / bz;
+        if (Math.max(p[0],p[2]) < -3 || Math.min(p[0],p[2]) > W + 3 || Math.max(p[1],p[3]) < -3 || Math.min(p[1],p[3]) > H + 3) continue;
+        const adjacent0 = this.facePackets[edge.f0], adjacent1 = edge.f1 < 0 ? null : this.facePackets[edge.f1];
+        // Put an edge just in front of its own visible faces, never as a final overlay.
+        packet.depth = Math.min((az + bz) * .5, adjacent0.visible ? adjacent0.depth : Infinity, adjacent1?.visible ? adjacent1.depth : Infinity) - .018;
+        packet.alpha = surfaceAlpha; drawList.push(packet);
+      }
+    }
+    for (const packet of this.pointPackets) {
+      const point = packet.point, x = point.p[0] - pivot[0], y = point.p[1] - pivot[1], z = point.p[2] - pivot[2];
+      const rx = x * cosY + z * sinY, rz = -x * sinY + z * cosY, depth = D + y * sinP + rz * cosP;
+      if (depth < near) continue;
+      const scale = F / depth, px = cx + rx * scale, py = cy - (y * cosP - rz * sinP) * scale, size = point.r * scale;
+      if (size < .35 || size > 100 || px + size < 0 || px - size > W || py + size < 0 || py - size > H) continue;
+      packet.p[0] = px; packet.p[1] = py; packet.p[2] = depth; packet.depth = depth; packet.size = size;
+      packet.alpha = clamp(point.a * fog(depth) * o.alpha * (point.lig || point.motif ? 1 + .2 * o.hover : 1)); drawList.push(packet);
+    }
+    drawList.sort((a, b) => b.depth - a.depth);
+    ctx.globalCompositeOperation = 'source-over'; ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    const shadeColor = (colorId, intensity, haze) => {
+      const l = Math.max(38, Math.min(166, Math.round(intensity * 128))), h = Math.max(0, Math.min(31, Math.round(haze * 128)));
+      const key = (colorId * 256 + l) * 32 + h;
+      let value = this.colorCache.get(key);
+      if (value === undefined) {
+        const base = this.paletteRGB[colorId], amount = h / 128, strength = l / 128;
+        const r = Math.max(0, Math.min(255, Math.round(base[0] * strength * (1 - amount) + bg[0] * amount)));
+        const g = Math.max(0, Math.min(255, Math.round(base[1] * strength * (1 - amount) + bg[1] * amount)));
+        const b = Math.max(0, Math.min(255, Math.round(base[2] * strength * (1 - amount) + bg[2] * amount)));
+        value = `rgb(${r},${g},${b})`; this.colorCache.set(key, value);
+      }
+      return value;
+    };
+    for (const item of drawList) {
+      ctx.globalAlpha = item.alpha;
+      if (item.kind === 'point') { ctx.drawImage(item.sprite, item.p[0] - item.size, item.p[1] - item.size, item.size * 2, item.size * 2); continue; }
+      if (item.kind === 'edge') {
+        const p = item.p; ctx.strokeStyle = '#15110F'; ctx.lineWidth = 1.05;
+        ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(p[2], p[3]); ctx.stroke(); continue;
+      }
+      // Opaque flat front/reverse/edge tones give the ribbon an academic illustration finish.
+      const polygon = this.polygonBuffer, ids = item.face.ids, count = item.clipped ? item.clipped.length : ids.length;
+      for (let i = 0; i < count; i++) {
+        const p = item.clipped ? item.clipped[i] : null, id = ids[i], k = i * 3;
+        polygon[k] = p ? p[0] : this.screenBuffer[id * 2];
+        polygon[k + 1] = p ? p[1] : this.screenBuffer[id * 2 + 1];
+      }
+      const paint = shadeColor(item.colorId, item.face.tone, item.haze);
+      // Expand perpendicular to each edge: radial expansion leaves cracks on long, narrow ribbon strips.
+      // This subpixel overlap hides internal mesh seams; contour strokes are separate depth-sorted edges.
+      let signedArea = 0;
+      for (let i = 0; i < count; i++) { const j = (i + 1) % count; signedArea += polygon[i * 3] * polygon[j * 3 + 1] - polygon[j * 3] * polygon[i * 3 + 1]; }
+      const direction = signedArea >= 0 ? 1 : -1;
+      ctx.beginPath();
+      for (let index = 0; index < count; index++) {
+        const p = index * 3, before = ((index + count - 1) % count) * 3, after = ((index + 1) % count) * 3;
+        const ax = polygon[p] - polygon[before], ay = polygon[p + 1] - polygon[before + 1], al = Math.sqrt(ax * ax + ay * ay) || 1;
+        const bx = polygon[after] - polygon[p], by = polygon[after + 1] - polygon[p + 1], bl = Math.sqrt(bx * bx + by * by) || 1;
+        const n0x = ay / al * direction, n0y = -ax / al * direction, n1x = by / bl * direction, n1y = -bx / bl * direction;
+        const scale = .31 / Math.max(.25, 1 + n0x * n1x + n0y * n1y);
+        const x = polygon[p] + (n0x + n1x) * scale, y = polygon[p + 1] + (n0y + n1y) * scale;
+        if (index) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      }
+      ctx.closePath(); ctx.fillStyle = paint; ctx.fill();
+    }
+    // A small warm halo marks the pocket; the body itself remains matte and sculptural.
+    const ss = this.siteScreen, pulse = reduceMotion ? .5 : .5 + .5 * Math.sin(o.time / 720);
+    const size = (1.8 + .24 * pulse + 1.2 * o.hover) * F / ss[2];
+    if (ss[2] > near && size < 260) {
+      ctx.globalAlpha = (.30 + .24 * o.hover) * o.alpha * (1 - e);
+      ctx.drawImage(this.glow, ss[0] - size, ss[1] - size, size * 2, size * 2);
+    }
+    if (o.labels > .01) {
+      ctx.font = '500 12px Lora, Georgia, serif'; ctx.textBaseline = 'middle'; ctx.lineWidth = .8;
+      const occupied = [];
+      const put = (point, text, rgb) => {
+        const q = camera(point); if (q[2] < near) return;
+        const p = project(q), dx = p[0] - ss[0], dy = p[1] - ss[1], length = Math.hypot(dx, dy) || 1;
+        const ux = dx / length, uy = dy / length, width = ctx.measureText(text).width;
+        let x = clamp(p[0] + ux * 24 - (ux < -.2 ? width : ux > .2 ? 0 : width / 2), 10, W - width - 10);
+        let y = clamp(p[1] + uy * 24, 26, H - 22);
+        for (let attempt = 0; attempt < 7 && occupied.some(box => x < box.x + box.w + 9 && x + width + 9 > box.x && Math.abs(y - box.y) < 18); attempt++) y += uy < 0 ? -19 : 19;
+        occupied.push({ x, y, w: width });
+        ctx.globalAlpha = o.labels * .46; ctx.strokeStyle = `rgb(${rgb})`;
+        ctx.beginPath(); ctx.moveTo(p[0], p[1]); ctx.lineTo(x + (ux < 0 ? width : 0), y); ctx.stroke();
+        ctx.globalAlpha = o.labels * .72; ctx.fillStyle = '#2B1815'; ctx.fillRect(x - 4, y - 9, width + 8, 18);
+        ctx.globalAlpha = Math.min(1, o.labels * 1.35); ctx.fillStyle = `rgb(${rgb})`; ctx.fillText(text, x, y);
+      };
+      this.motifs.forEach(motif => put(motif.p, motif.label, '229,203,174'));
+      this.ligLabels.forEach(ligand => put(ligand.p, ligand.label, ligand.rgb));
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+/* ---------------- Stage ---------------- */
+const story = $('#story'), stage = $('#stage'), svg = $('#stageSvg'), chemWrap = $('#chemWrap'), stageChem = $('#stageChem');
+const intro = $('#intro'), hint = $('#hint'), tip = $('#tip'), tipText = $('#tipText'), panel = $('#panel'), panelInner = $('#panelInner'), rail = $('#rail');
+const html = document.documentElement, nav = $('#nav');
+const cloud = new Cloud($('#cloud'));
+let stageMech = null, stageView = null, TL = null, PANEL = {};
+
+function legendHTML(M, k) { return M.steps[k].arrows.map((a, i) => `<li data-i="${i}"><b>${i + 1}</b><span>${a.say}</span></li>`).join(''); }
+function keyHTML(M) { return M.groups.map(g => `<span><i class="k-${g}"></i>${GROUP_NAMES[g]}</span>`).join(''); }
+function buildTimeline(M) {
+  const segs = [['intro', 35], ['zoom', 75], ['site', 50]];
+  M.steps.forEach((s, i) => segs.push(['s' + i, s.pre ? 135 : 115]));
+  segs.push(['done', 60]);
+  const total = segs.reduce((a, s) => a + s[1], 0), T = { order: segs.map(s => s[0]), totalVh: total };
+  let acc = 0;
+  for (const [id, v] of segs) { T[id] = [acc / total, (acc + v) / total]; acc += v; }
+  return T;
+}
+function setStageMech(M) {
+  stageMech = M; TL = buildTimeline(M);
+  story.style.height = (TL.totalVh + 100) + 'vh';
+  stageView = new MechView(stageChem, M);
+  cloud.setFold(M);
+  $('#heroSub').textContent = 'From substrate to product, follow the electron moves that make a reaction happen. An interactive preview of enzyme mechanism prediction.';
+  $('#sceneName').textContent = `${M.enzyme} · ${M.reaction.toLowerCase()}`;
+  tipText.textContent = `${M.motifs3d.join(', ')} line this pocket. Scroll to zoom in.`;
+  $('#stageKey').innerHTML = keyHTML(M);
+  PANEL = {
+    site: `<div class="count">${M.enzyme} active site</div><h2>${M.site.title}</h2><p>${M.site.text}</p><p class="desc">${M.site.note} Keep scrolling to push the first set of arrows.</p>`,
+    done: `<div class="count">Net reaction</div><h2>${M.done.title}</h2><p class="eq">${M.equation}</p><p class="desc">${M.done.text}</p><a class="btn primary" href="#predict">Explore a substrate</a>`
+  };
+  M.steps.forEach((st, k) => { PANEL['s' + k] = `<div class="count">Stage ${k + 1} of ${M.steps.length}</div><h2>${st.title}</h2><p class="desc">${st.text}</p><ol class="legend">${legendHTML(M, k)}</ol>`; });
+  rail.replaceChildren();
+  const items = [{ id: 'site', label: 'Active site', at: lerp(...TL.site, .5) }]
+    .concat(M.steps.map((st, k) => ({ id: 's' + k, label: st.short, num: k + 1, at: lerp(...TL['s' + k], st.pre ? .68 : .66) })))
+    .concat([{ id: 'done', label: 'Products', at: lerp(...TL.done, .6) }]);
+  items.forEach(it => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.id = it.id;
+    b.innerHTML = `<span>${it.label}</span><i aria-hidden="true"></i>`;
+    b.setAttribute('aria-label', it.num ? `Step ${it.num}: ${it.label}` : it.label);
+    b.addEventListener('click', () => jumpTo(it.at));
+    rail.appendChild(b);
+  });
+  curPhase = null;
+  layout();
+}
+function storyTotal() { return story.offsetHeight - stage.offsetHeight; }
+function storyTop() { return story.getBoundingClientRect().top + scrollY; }
+function jumpTo(p) { scrollTo({ top: storyTop() + p * storyTotal(), behavior: (reduceMotion || motionPaused) ? 'auto' : 'smooth' }); }
+$('#watchBtn').addEventListener('click', () => jumpTo(lerp(...TL.site, .5)));
+
+let W = 0, Hh = 0, view0 = null, chem1 = null;
+function layout() {
+  W = stage.clientWidth; Hh = stage.clientHeight;
+  svg.setAttribute('viewBox', `0 0 ${W} ${Hh}`);
+  const dpr = Math.min(2, devicePixelRatio || 1);
+  cloud.size(W, Hh, dpr);
+  const wide = W > 860, rr = cloud.radius || 25;
+  view0 = wide ? { s: Math.min(W * .46, Hh * .78) / (2 * rr), c: [W * .68, Hh * .53] } : { s: Math.min(W * .84, Hh * .40) / (2 * rr), c: [W * .5, Hh * .72] };
+  const bb = stageMech.bb;
+  if (wide) {
+    const x0 = W * .34, x1 = W - Math.max(150, W * .11), y0 = Hh * .09, y1 = Hh * .9;
+    chem1 = { s: Math.min((x1 - x0) / bb.w, (y1 - y0) / bb.h, 1.62), c: [(x0 + x1) / 2, (y0 + y1) / 2] };
+  } else {
+    const y0 = 140, y1 = Hh * .6;
+    chem1 = { s: Math.min((W - 42) / bb.w, (y1 - y0) / bb.h), c: [W / 2, (y0 + y1) / 2] };
+  }
+}
+
+let curPhase = null, swapTimer = 0;
+function setPhase(id) {
+  if (id === curPhase) return;
+  curPhase = id;
+  [...rail.children].forEach(b => b.removeAttribute('aria-current'));
+  const btn = rail.querySelector(`[data-id="${id}"]`);
+  if (btn) btn.setAttribute('aria-current', 'step');
+  if (!PANEL[id]) return;
+  clearTimeout(swapTimer);
+  panelInner.classList.add('swap');
+  swapTimer = setTimeout(() => { panelInner.innerHTML = PANEL[id]; panelInner.classList.remove('swap'); }, reduceMotion ? 0 : 200);
+}
+
+/* Pointer: drag to rotate, hover to light the active site */
+let dragging = false, dragId = null, lastX = 0, lastY = 0, lastT = 0, hoverOn = false, tipOn = false, hoverT = 0, zoomT = 0;
+stage.addEventListener('pointerdown', e => {
+  if (e.button !== 0 || zoomT > .02 || e.target.closest('a, button, input, .intro p')) return;
+  dragging = true; dragId = e.pointerId; lastX = e.clientX; lastY = e.clientY; lastT = performance.now();
+  stage.setPointerCapture(e.pointerId); stage.classList.add('dragging');
+});
+stage.addEventListener('pointermove', e => {
+  const r = stage.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+  if (dragging && e.pointerId === dragId) {
+    const now = performance.now(), dx = e.clientX - lastX, dy = e.clientY - lastY, dt = Math.max(8, now - lastT) / 1000;
+    cloud.yaw += dx * .009; cloud.pitch = clamp(cloud.pitch + dy * .007, -1.35, 1.35);
+    cloud.spin = clamp(lerp(cloud.spin, dx * .009 / dt, .5), -6, 6);
+    lastX = e.clientX; lastY = e.clientY; lastT = now;
+  }
+  const rr = (cloud.radius || 25) * view0.s;
+  hoverOn = !dragging && zoomT < .02 && Math.hypot(x - view0.c[0], y - view0.c[1]) < rr * 1.15;
+  tipOn = hoverOn && Math.hypot(x - cloud.siteScreen[0], y - cloud.siteScreen[1]) < 70;
+  tip.style.left = x + 'px'; tip.style.top = y + 'px';
+});
+const endDrag = () => { dragging = false; stage.classList.remove('dragging'); };
+stage.addEventListener('pointerup', endDrag); stage.addEventListener('pointercancel', endDrag);
+stage.addEventListener('pointerleave', () => { hoverOn = false; tipOn = false; });
+
+let pS = 0, last = performance.now(), running = false, stageVisible = true;
+function stageFrame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now;
+  if (!motionPaused) stageClock += dt * 1000;
+  const p = clamp(-story.getBoundingClientRect().top / Math.max(1, storyTotal()));
+  pS = (reduceMotion || motionPaused) ? p : pS + (p - pS) * Math.min(1, dt * 9);
+  if (Math.abs(p - pS) < .0004) pS = p;
+  hoverT = motionPaused ? (hoverOn ? 1 : 0) : hoverT + ((hoverOn ? 1 : 0) - hoverT) * Math.min(1, dt * 6);
+  $('#stageProgress').style.width = `${(pS * 100).toFixed(2)}%`;
+  const t = ease(seg(pS, TL.zoom[0], TL.zoom[1])); zoomT = t;
+  stage.classList.toggle('zoomed', t > .02); stage.classList.toggle('deep', t > .6);
+  if (t < .02 && !dragging && !motionPaused) { cloud.spin += (.16 - cloud.spin) * Math.min(1, dt * 1.4); cloud.yaw += cloud.spin * dt; }
+  cloud.draw({ e: t, alpha: lerp(1, .32, seg(t, .55, 1)), s0: view0.s, c0: view0.c, c1: chem1.c, hover: hoverT, time: stageClock, labels: (.55 + .45 * hoverT) * (1 - seg(t, 0, .3)) });
+  // Mechanism overlay grows out of the projected active site
+  const ss = cloud.siteScreen, cs = Math.exp(lerp(Math.log(chem1.s * .05), Math.log(chem1.s), seg(t, .3, 1)));
+  const ox = lerp(ss[0], chem1.c[0], t), oy = lerp(ss[1], chem1.c[1], t), bb = stageMech.bb;
+  chemWrap.setAttribute('transform', `translate(${f1(ox)},${f1(oy)}) scale(${cs.toFixed(4)}) translate(${-(bb.x + bb.w / 2)},${-(bb.y + bb.h / 2)})`);
+  chemWrap.setAttribute('opacity', op2(seg(t, .55, .95)));
+  const zl = TL.zoom[1] - TL.zoom[0];
+  const io = 1 - seg(pS, TL.intro[1] * .3, TL.zoom[0] + zl * .3);
+  intro.style.opacity = io; intro.style.visibility = io < .02 ? 'hidden' : 'visible';
+  intro.style.transform = (W > 860 ? 'translateY(-50%) ' : '') + `translateY(${f1(-30 * (1 - io))}px)`;
+  hint.style.opacity = 1 - seg(pS, 0, TL.intro[1] * .6);
+  tip.style.opacity = (tipOn && t < .02) ? 1 : 0;
+  panel.classList.toggle('show', pS > TL.zoom[0] + zl * .75);
+  rail.classList.toggle('show', pS > TL.zoom[0] + zl * .6);
+  let phase = 'site', params;
+  if (pS < TL.site[1]) {
+    const u = seg(pS, TL.site[0], TL.site[1]), halos = {};
+    stageMech.siteHalos.forEach(([ids, a, b]) => ids.forEach(id => { halos[id] = bell(seg(u, a, b)) * .85; }));
+    params = { A: stageMech.states[0], halos };
+  } else if (pS < TL.done[0]) {
+    let k = stageMech.steps.findIndex((_, i) => pS < TL['s' + i][1]); if (k < 0) k = stageMech.steps.length - 1;
+    params = stepParams(stageMech, k, seg(pS, ...TL['s' + k])); params.halos = {};
+    phase = 's' + k;
+    if (curPhase === phase) panelInner.querySelectorAll('.legend li').forEach((li, i) => li.classList.toggle('on', (params.q[i] || 0) > 0 && params.arrowAlpha > .5));
+  } else {
+    params = { A: stageMech.steps[stageMech.steps.length - 1].to, halos: stageMech.doneHalos };
+    phase = 'done';
+  }
+  params.time = stageClock;
+  stageView.frame(params);
+  setPhase(phase);
+  const past = story.getBoundingClientRect().bottom <= nav.offsetHeight + 8;
+  html.classList.toggle('past-stage', past); nav.classList.toggle('on-page', past);
+  if (stageVisible && !document.hidden && !motionPaused) requestAnimationFrame(stageFrame); else running = false;
+}
+function startStage() { if (!running && stageVisible && !document.hidden) { running = true; last = performance.now(); requestAnimationFrame(stageFrame); } }
+new IntersectionObserver(es => { stageVisible = es[0].isIntersecting; updateAmbientMotion(); if (stageVisible) startStage(); else { html.classList.add('past-stage'); nav.classList.add('on-page'); } }).observe(story);
+addEventListener('resize', () => { layout(); startStage(); });
+addEventListener('scroll', startStage, {passive:true});
+stage.addEventListener('pointermove', () => { if (motionPaused) startStage(); }, {passive:true});
+stage.addEventListener('pointerleave', startStage, {passive:true});
+function updateAmbientMotion() {
+  html.classList.toggle('ambient-rest', !stageVisible || document.hidden);
+  html.classList.toggle('page-hidden', document.hidden);
+}
+const mapleObserver = new IntersectionObserver(entries => {
+  entries.forEach(entry => entry.target.classList.toggle('maple-visible', entry.isIntersecting));
+}, {threshold:0});
+document.querySelectorAll('.section').forEach(section => {
+  if (section.querySelector('.maple-field')) mapleObserver.observe(section);
+});
+document.addEventListener('visibilitychange', () => { updateAmbientMotion(); if (!document.hidden) startStage(); });
+const motionToggle = $('#motionToggle');
+function updateMotionControl(){
+  html.classList.toggle('motion-paused', motionPaused);
+  motionToggle.textContent = motionPaused ? 'Resume motion' : 'Pause motion';
+  motionToggle.setAttribute('aria-pressed', String(motionPaused));
+}
+motionToggle.addEventListener('click', () => { motionPaused = !motionPaused; updateMotionControl(); if (motionPaused) player.pause(); startStage(); });
+motionPreference.addEventListener('change', e => { reduceMotion = e.matches; motionPaused = e.matches; updateMotionControl(); startStage(); });
+updateMotionControl();
+if (document.fonts) document.fonts.ready.then(startStage);
+setStageMech(CHYMO);
+startStage();
+
+/* ---------------- Example explorer; model connection is pending ---------------- */
+const form = $('#predictForm'), smilesIn = $('#smiles'), enzymeIn = $('#enzyme');
+const smilesMsg = $('#smilesMsg'), previewMol = $('#previewMol'), previewMeta = $('#previewMeta');
+const chipsEl = $('#chips'), result = $('#result'), loading = $('#loading');
+const resultBody = $('#resultBody'), bannerText = $('#bannerText'), productsEl = $('#products');
+const predictBtn = $('#predictBtn'), playerBox = $('#player'), pendingMechanism = $('#pendingMechanism');
+const SOURCE_IDS = { chymo: '387', tim: '324', ldh: '584' };
+let lastMech = null, previewTimer = 0, previewEpoch = 0, inputEpoch = 0, jobEpoch = 0, submitting = false;
+const resultGrid = resultBody.querySelector('.result-grid');
+const requestStatus = document.createElement('p');
+requestStatus.id = 'demoRequestStatus'; requestStatus.className = 'msg';
+requestStatus.setAttribute('role', 'status'); requestStatus.setAttribute('aria-live', 'polite');
+requestStatus.setAttribute('aria-atomic', 'true'); predictBtn.insertAdjacentElement('afterend', requestStatus);
+const resultTitle = document.createElement('h3'); resultTitle.id = 'demoResultTitle'; resultTitle.tabIndex = -1;
+resultBody.prepend(resultTitle); result.setAttribute('aria-labelledby', 'demoResultTitle');
+function actionStatus(message, error = false) {
+  requestStatus.textContent = message; requestStatus.className = error ? 'msg err' : 'msg';
+}
+function beginResult(message) {
+  result.hidden = false; resultBody.hidden = false; result.setAttribute('aria-busy', 'true');
+  resultTitle.textContent = message; bannerText.textContent = 'Curated examples run locally in this browser. The prediction model is not connected.';
+  resultGrid.style.display = 'none'; loading.hidden = false;
+  const line = document.createElement('li'); line.textContent = message; loading.replaceChildren(line);
+}
+function focusResult(current) {
+  // Wait until the completed result has layout before scrolling and moving keyboard focus.
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!current() || result.hidden) return;
+    resultTitle.focus({ preventScroll: true });
+    result.scrollIntoView({ behavior: 'auto', block: 'start' });
+  }));
+}
+function revealResult(current) {
+  result.hidden = false; resultBody.hidden = false; loading.hidden = true;
+  resultGrid.style.removeProperty('display'); result.removeAttribute('aria-busy'); focusResult(current);
+}
+function showActionError(error, current, message) {
+  if (!current()) return;
+  console.error('Differ example explorer:', error);
+  result.hidden = false; resultBody.hidden = false; loading.hidden = true;
+  resultGrid.style.display = 'none'; resultTitle.textContent = 'The example could not be opened';
+  bannerText.textContent = message || 'The browser could not finish drawing this view. Your input has been kept. Choose an illustrated example and try again.';
+  actionStatus(bannerText.textContent, true); focusResult(current);
+}
+function fallbackMechanism(M, error) {
+  console.error('Differ mechanism drawing:', error);
+  playerBox.hidden = true;
+  if (!pendingMechanism) return;
+  pendingMechanism.hidden = false;
+  const heading = document.createElement('h3'); heading.textContent = 'The mechanism, stage by stage';
+  const note = document.createElement('p'); note.textContent = 'The animated drawing could not be displayed in this browser. The curated example is available below; no model prediction has been made.';
+  const list = document.createElement('ol');
+  M.steps.forEach(step => {
+    const li = document.createElement('li'), title = document.createElement('strong'); title.textContent = step.title;
+    const text = document.createElement('p'); text.textContent = step.text; li.append(title, text); list.appendChild(li);
+  });
+  pendingMechanism.replaceChildren(heading, note, list);
+}
+function pendingResult() {
+  if (!pendingMechanism) return;
+  const eyebrow = document.createElement('div'); eyebrow.className = 'eyebrow'; eyebrow.textContent = 'Prediction in development';
+  const title = document.createElement('h3'); title.textContent = 'A place for your mechanism.';
+  const text = document.createElement('p'); text.textContent = 'No products or reaction steps have been predicted for this substrate. Choose one of the three illustrated examples to explore an available mechanism.';
+  const link = document.createElement('a'); link.href = '#predict'; link.textContent = 'Choose an illustrated example';
+  pendingMechanism.replaceChildren(eyebrow, title, text, link); pendingMechanism.hidden = false;
+}
+
+// Matching is deliberately exact. This demo does not canonicalize SMILES or infer stereochemistry.
+function matchMech(value) { return MECHS.find(M => M.smiles === value.trim()) || null; }
+// Replace this adapter only when a model endpoint and its output contract are ready.
+async function predictMechanism(smiles) { return { mech: matchMech(smiles) }; }
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function molTheme() {
+  const c = cssVar('--mol-c'), o = cssVar('--mol-o'), n = cssVar('--mol-n'), h = cssVar('--mol-h');
+  return { C: c, O: o, N: n, F: c, CL: c, BR: o, I: o, P: '#C9741B', S: '#C98A1B', B: c, SI: c, H: h, BACKGROUND: 'transparent' };
+}
+function parseSmiles(value) {
+  return new Promise((resolve, reject) => {
+    if (!window.SmilesDrawer) { reject(new Error('viewer-unavailable')); return; }
+    try { SmilesDrawer.parse(value, tree => tree ? resolve(tree) : reject(new Error('parse')), error => reject(error || new Error('parse'))); }
+    catch (error) { reject(error); }
+  });
+}
+function emptyMessage(host, message) {
+  const p = document.createElement('p'); p.className = 'empty'; p.textContent = message; host.replaceChildren(p);
+}
+async function drawMol(smiles, host, options = {}) {
+  const current = options.isCurrent || (() => true);
+  const tree = options.tree || await parseSmiles(smiles);
+  if (!current()) return null;
+  const target = document.createElementNS(NS, 'svg');
+  target.setAttribute('role', 'img'); target.setAttribute('aria-label', options.label || 'Structure drawn from SMILES');
+  const drawer = new SmilesDrawer.SvgDrawer({ width: 360, height: 260, bondThickness: 1.25, bondLength: 26,
+    shortBondLength: .82, bondSpacing: 5, fontFamily: 'Lora, Georgia, serif', fontSizeLarge: 7.5,
+    fontSizeSmall: 4.6, padding: 14, compactDrawing: false, themes: { ember: molTheme() } });
+  drawer.draw(tree, target, 'ember');
+  if (!target.getAttribute('viewBox')) target.setAttribute('viewBox', '0 0 360 260');
+  target.removeAttribute('width'); target.removeAttribute('height');
+  // Explicit bounds keep masks from clipping a nearly horizontal/vertical single bond.
+  const box = target.getAttribute('viewBox').split(/\s+/).map(Number);
+  target.querySelectorAll('mask').forEach(mask => {
+    mask.setAttribute('maskUnits', 'userSpaceOnUse');
+    ['x','y','width','height'].forEach((name, i) => mask.setAttribute(name, box[i]));
+  });
+  if (!current()) return null;
+  host.replaceChildren(target);
+  try { return drawer.preprocessor.graph.vertices.filter(v => v.value && v.value.element !== 'H').length; }
+  catch (_) { return null; }
+}
+function setInputStatus(message, invalid = false) {
+  smilesMsg.textContent = message; smilesMsg.className = invalid ? 'msg err' : 'msg';
+  if (invalid) smilesIn.setAttribute('aria-invalid', 'true'); else smilesIn.removeAttribute('aria-invalid');
+}
+function syncExampleContext() {
+  const M = matchMech(smilesIn.value);
+  [...chipsEl.children].forEach(button => button.setAttribute('aria-pressed', String(!!M && button.dataset.id === M.id)));
+  enzymeIn.value = M ? `${M.enzyme} (${M.ec})` : '';
+  enzymeIn.readOnly = true;
+  enzymeIn.placeholder = 'Shown when a curated example is selected';
+  if (!submitting) predictBtn.textContent = M ? 'Show example mechanism' : 'Explore substrate';
+  return M;
+}
+function resetBusy() {
+  submitting = false; predictBtn.disabled = false; form.removeAttribute('aria-busy');
+  result.removeAttribute('aria-busy'); loading.hidden = true; syncExampleContext();
+}
+function clearResults() {
+  result.hidden = true; resultBody.hidden = true; loading.hidden = true;
+  productsEl.replaceChildren(); bannerText.textContent = ''; lastMech = null;
+  // The form must still work if an optional animation component failed to initialize.
+  try { player.clear(); } catch (error) { console.warn('Differ player reset:', error); }
+  playerBox.hidden = true; resultGrid.style.removeProperty('display');
+  if (pendingMechanism) pendingMechanism.hidden = true;
+}
+function reportPreviewError(error) {
+  const unavailable = error && error.message === 'viewer-unavailable';
+  emptyMessage(previewMol, unavailable ? 'The structure renderer is unavailable.' : 'No structure to display for this input.');
+  previewMeta.textContent = unavailable ? 'Preview unavailable' : 'Check the SMILES';
+  setInputStatus(unavailable
+    ? 'The structure renderer did not load. Reload the page to try again; no prediction has been made.'
+    : 'This SMILES could not be drawn. Check the brackets, ring closures and charges.', !unavailable);
+}
+async function updatePreview() {
+  const epoch = ++previewEpoch, value = smilesIn.value.trim(), M = syncExampleContext();
+  const current = () => epoch === previewEpoch && smilesIn.value.trim() === value;
+  if (!value) {
+    emptyMessage(previewMol, 'Enter a SMILES string to draw the substrate.');
+    previewMeta.textContent = 'Awaiting input'; setInputStatus('Choose an example or enter a substrate SMILES.'); return;
+  }
+  try {
+    const heavy = await drawMol(value, previewMol, { label: 'Substrate structure', isCurrent: current });
+    if (!current()) return;
+    previewMeta.textContent = heavy ? `${heavy} heavy atoms` : 'Structure drawn from SMILES';
+    setInputStatus(M ? `Curated example: ${M.substrate}.` : 'Structure drawn. Model predictions are not yet available.');
+  } catch (error) {
+    if (!current()) return;
+    if (M) {
+      emptyMessage(previewMol, 'The molecule preview is unavailable. You can still open the curated mechanism.');
+      previewMeta.textContent = 'Curated example selected';
+      setInputStatus(`Curated example: ${M.substrate}. Its mechanism is available below.`);
+    } else reportPreviewError(error);
+  }
+}
+function inputChanged(immediate = false) {
+  ++inputEpoch; ++jobEpoch; ++previewEpoch; clearTimeout(previewTimer);
+  resetBusy(); clearResults(); syncExampleContext();
+  actionStatus('');
+  emptyMessage(previewMol, smilesIn.value.trim() ? 'Drawing the substrate…' : 'Enter a SMILES string to draw the substrate.');
+  previewMeta.textContent = 'Awaiting drawing'; setInputStatus('');
+  if (immediate) updatePreview(); else previewTimer = setTimeout(updatePreview, 260);
+}
+MECHS.forEach(M => {
+  const button = document.createElement('button'); button.type = 'button'; button.className = 'chip'; button.dataset.id = M.id;
+  const title = document.createElement('b'); title.textContent = M.chip;
+  const text = document.createElement('span'); text.textContent = `${M.enzyme}: ${M.reactionInline}`;
+  const count = document.createElement('em'); count.textContent = `${M.steps.length} ${M.steps.length === 1 ? 'stage' : 'stages'}`;
+  button.append(title, text, count); button.addEventListener('click', () => { smilesIn.value = M.smiles; inputChanged(true); });
+  chipsEl.appendChild(button);
+});
+smilesIn.value = CHYMO.smiles;
+smilesIn.style.fontFamily = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
+smilesIn.addEventListener('input', () => inputChanged());
+smilesMsg.setAttribute('role', 'status');
+
+function makeProduct(pr, current) {
+  const figure = document.createElement('figure'); figure.className = 'plate';
+  const mol = document.createElement('div'); mol.className = 'mol';
+  const caption = document.createElement('figcaption'), name = document.createElement('b'); name.textContent = pr.name;
+  const row = document.createElement('span'); row.className = 'smiles-row';
+  const code = document.createElement('code'); code.textContent = pr.smiles;
+  const copy = document.createElement('button'); copy.className = 'copy'; copy.type = 'button'; copy.textContent = 'Copy';
+  copy.setAttribute('aria-label', `Copy ${pr.name} SMILES`);
+  copy.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(pr.smiles); copy.textContent = 'Copied'; }
+    catch (_) {
+      const range = document.createRange(); range.selectNodeContents(code);
+      const selection = getSelection(); if (selection) { selection.removeAllRanges(); selection.addRange(range); }
+      copy.textContent = 'Selected';
+    }
+    setTimeout(() => { if (copy.isConnected) copy.textContent = 'Copy'; }, 1600);
+  });
+  row.append(code, copy); caption.append(name, row); figure.append(mol, caption); productsEl.appendChild(figure);
+  return drawMol(pr.smiles, mol, { label: pr.name, isCurrent: current }).catch(() => {
+    if (current()) emptyMessage(mol, `Structure preview unavailable. SMILES: ${pr.smiles}`);
+  });
+}
+function setReference(M) {
+  const host = $('#playerRef'), link = document.createElement('a');
+  link.href = `https://www.ebi.ac.uk/thornton-srv/m-csa/entry/${SOURCE_IDS[M.id]}/`;
+  link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = `M-CSA entry ${SOURCE_IDS[M.id]}`;
+  host.replaceChildren(document.createTextNode(`${M.enzyme} · `), link,
+    document.createTextNode('. Schematic teaching sequence; some catalytic events are grouped. Not a model prediction.'));
+}
+async function openExample(event) {
+  if (event) event.preventDefault();
+  if (submitting) { actionStatus('The example is opening. Please wait a moment.'); return; }
+  clearTimeout(previewTimer); ++previewEpoch;
+  const value = smilesIn.value.trim(), inputAtStart = inputEpoch, job = ++jobEpoch;
+  const current = () => job === jobEpoch && inputAtStart === inputEpoch && smilesIn.value.trim() === value;
+  try {
+    clearResults();
+    if (!value) {
+      setInputStatus('Enter a substrate SMILES or choose an example.', true);
+      actionStatus('Choose an illustrated example or enter a substrate SMILES.', true); smilesIn.focus(); return;
+    }
+    submitting = true; predictBtn.disabled = true; predictBtn.textContent = 'Opening…'; form.setAttribute('aria-busy', 'true');
+    const selected = matchMech(value), opening = selected ? `Opening the ${selected.enzyme} example…` : 'Checking the substrate…';
+    actionStatus(opening); beginResult(opening);
+    // Yield for the immediate status to paint before synchronous SVG layout work.
+    await new Promise(resolve => setTimeout(resolve, 0)); if (!current()) return;
+    let previewAvailable = false;
+    try {
+      // Custom input is always parsed afresh. Exact bundled examples remain usable if optional depiction fails.
+      const tree = await parseSmiles(value); if (!current()) return;
+      const heavy = await drawMol(value, previewMol, { tree, label: 'Substrate structure', isCurrent: current });
+      if (!current()) return;
+      previewMeta.textContent = heavy ? `${heavy} heavy atoms` : 'Structure drawn from SMILES';
+      setInputStatus(selected ? `Curated example: ${selected.substrate}.` : 'Structure drawn.'); previewAvailable = true;
+    } catch (error) {
+      if (!current()) return;
+      if (!selected) {
+        reportPreviewError(error);
+        const unavailable = error && error.message === 'viewer-unavailable';
+        showActionError(error, current, unavailable
+          ? 'The molecule renderer is unavailable. Choose an illustrated example to open its bundled mechanism, or reload the page to retry the custom structure.'
+          : 'This SMILES could not be drawn. Check the input or choose an illustrated example. No products or mechanism have been predicted.');
+        resultTitle.textContent = unavailable ? 'Structure preview unavailable' : 'Check the substrate SMILES'; return;
+      }
+      console.warn('Differ optional substrate depiction:', error);
+      emptyMessage(previewMol, 'Molecule preview unavailable; the curated mechanism can still be explored.');
+      previewMeta.textContent = 'Curated example selected'; setInputStatus(`Curated example: ${selected.substrate}.`);
+    }
+    const response = await predictMechanism(value); if (!current()) return;
+    const M = response.mech;
+    if (!M) {
+      resultTitle.textContent = 'Substrate preview · prediction pending';
+      bannerText.textContent = 'Your substrate has been drawn. The model is still in development; no products or mechanism have been predicted.';
+      const figure = document.createElement('figure'); figure.className = 'plate';
+      const mol = document.createElement('div'); mol.className = 'mol'; emptyMessage(mol, 'Product prediction will appear here when the model is connected.');
+      const caption = document.createElement('figcaption'); caption.textContent = 'Products · pending model connection';
+      figure.append(mol, caption); productsEl.appendChild(figure);
+      playerBox.hidden = true; pendingResult();
+      setInputStatus('Structure drawn. Choose a curated example to explore an available mechanism.');
+      actionStatus('Substrate preview opened below. Prediction is not connected; the three illustrated examples are available.');
+    } else {
+      lastMech = M; resultTitle.textContent = `${M.enzyme} · illustrated example`;
+      bannerText.textContent = `Curated demonstration: ${M.enzyme} (${M.ec}). This hand-drawn scheme illustrates the interface; it is not a model prediction.`;
+      // Product depiction is optional; textual product names and SMILES are always retained.
+      await Promise.allSettled(M.products.map(product => makeProduct(product, current))); if (!current()) return;
+      if (M.cofactorOut) {
+        const note = document.createElement('p'); note.className = 'cofnote';
+        const label = document.createElement('b'); label.textContent = 'Cofactor. ';
+        note.append(label, document.createTextNode(M.cofactorOut)); productsEl.appendChild(note);
+      }
+      playerBox.hidden = false; if (pendingMechanism) pendingMechanism.hidden = true;
+      setReference(M);
+      let diagramAvailable = true;
+      try { player.load(M); } catch (error) { diagramAvailable = false; fallbackMechanism(M, error); }
+      setInputStatus(`Curated example: ${M.substrate}.`);
+      actionStatus(diagramAvailable
+        ? `${M.enzyme} example opened below: products and ${M.steps.length} mechanism ${M.steps.length === 1 ? 'stage' : 'stages'}.${previewAvailable ? '' : ' The molecule preview is unavailable.'}`
+        : `${M.enzyme} example opened below. The animated drawing is unavailable, so the curated steps are shown as text.`);
+    }
+    revealResult(current);
+  } catch (error) {
+    showActionError(error, current);
+  } finally { if (job === jobEpoch) resetBusy(); }
+}
+// Direct button activation works in script-enabled previews that prohibit native form submission.
+predictBtn.type = 'button';
+predictBtn.addEventListener('click', openExample);
+form.addEventListener('submit', openExample);
+form.addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.isComposing && (event.target === smilesIn || event.target === enzymeIn)) {
+    event.preventDefault(); openExample(event);
+  }
+});
+form.dataset.ready = 'true';
+$('#toStage').addEventListener('click', () => {
+  if (!lastMech) return;
+  if (stageMech !== lastMech) setStageMech(lastMech);
+  jumpTo(0);
+});
+
+/* ---------------- Mechanism player ---------------- */
+const player = (() => {
+  const svgP = $('#playerSvg'), root = $('#playerChem'), tabs = $('#tabs'), playBtn = $('#playBtn');
+  const capTitle = $('#capTitle'), capText = $('#capText'), capLegend = $('#capLegend');
+  const progress = $('#stepProgress'), progressText = $('#stepProgressText'), exportBtn = $('#exportStep');
+  let M = null, view = null, durations = [], k = 0, u = .66, particleTime = 0;
+  let playing = !reduceMotion && !motionPaused, visible = false, raf = 0, lastStamp = null;
+  function setPlayLabel() {
+    playBtn.setAttribute('aria-pressed', String(playing));
+    playBtn.setAttribute('aria-label', playing ? 'Pause mechanism animation' : 'Play mechanism animation');
+    playBtn.innerHTML = playing
+      ? '<svg viewBox="0 0 14 14" aria-hidden="true"><rect x="2.5" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="8.5" y="2" width="3" height="10" rx="1" fill="currentColor"/></svg>Pause'
+      : '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M3.5 2.2v9.6L11.8 7z" fill="currentColor"/></svg>Play';
+  }
+  function caption() {
+    [...tabs.children].forEach((button, index) => button.setAttribute('aria-pressed', String(index === k)));
+    capTitle.textContent = `Step ${k + 1} of ${M.steps.length}. ${M.steps[k].title}`;
+    capText.textContent = M.steps[k].text; capLegend.innerHTML = legendHTML(M, k);
+    svgP.setAttribute('aria-label', `${M.enzyme}. Step ${k + 1}: ${M.steps[k].title}. Curated schematic.`);
+  }
+  function render() {
+    if (!M || !view) return;
+    const parameters = stepParams(M, k, u); parameters.time = particleTime; parameters.halos = {};
+    view.frame(parameters);
+    capLegend.querySelectorAll('li').forEach((li, index) => li.classList.toggle('on', (parameters.q[index] || 0) > 0 && parameters.arrowAlpha > .5));
+    const percent = Math.round(u * 100);
+    if (progress) { progress.value = String(percent); progress.setAttribute('aria-valuetext', `${percent} percent of step ${k + 1}: ${M.steps[k].title}`); }
+    if (progressText) progressText.textContent = `${percent}%`;
+  }
+  function stop() { if (raf) cancelAnimationFrame(raf); raf = 0; lastStamp = null; }
+  function canRun() { return !!M && playing && visible && !document.hidden && !result.hidden && !playerBox.hidden; }
+  function frame(now) {
+    raf = 0; if (!canRun()) { lastStamp = null; return; }
+    const delta = lastStamp === null ? 0 : Math.min(250, Math.max(0, now - lastStamp)); lastStamp = now;
+    particleTime += delta;
+    let elapsed = u * durations[k] + delta;
+    while (elapsed >= durations[k]) { elapsed -= durations[k]; k = (k + 1) % M.steps.length; caption(); }
+    u = elapsed / durations[k]; render(); raf = requestAnimationFrame(frame);
+  }
+  function syncLoop() { stop(); if (canRun()) raf = requestAnimationFrame(frame); }
+  function pause() { playing = false; stop(); setPlayLabel(); render(); }
+  playBtn.addEventListener('click', () => { if (!M) return; playing = !playing; setPlayLabel(); syncLoop(); });
+  if (progress) {
+    progress.min = '0'; progress.max = '100'; progress.step = '1';
+    progress.setAttribute('aria-label', 'Progress through the selected mechanism step');
+    progress.addEventListener('input', () => {
+      if (!M) return;
+      playing = false; stop(); u = clamp(Number(progress.value) / 100); particleTime = u * durations[k]; setPlayLabel(); render();
+    });
+  }
+  new IntersectionObserver(entries => { visible = entries[0].isIntersecting; syncLoop(); }).observe(svgP);
+  document.addEventListener('visibilitychange', syncLoop);
+  matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', event => { if (event.matches) pause(); });
+
+  if (exportBtn) exportBtn.addEventListener('click', () => {
+    if (!M || !view) return;
+    // Capture precisely the displayed frame, including its current arrows and bond changes.
+    const clone = svgP.cloneNode(true), originals = [svgP, ...svgP.querySelectorAll('*')];
+    const copies = [clone, ...clone.querySelectorAll('*')];
+    const properties = ['fill', 'fill-opacity', 'stroke', 'stroke-opacity', 'stroke-width', 'stroke-linecap',
+      'stroke-linejoin', 'stroke-dasharray', 'stroke-dashoffset', 'font-family', 'font-size', 'font-weight',
+      'letter-spacing', 'text-anchor', 'dominant-baseline', 'opacity', 'filter'];
+    originals.forEach((element, index) => {
+      const style = getComputedStyle(element);
+      properties.forEach(property => {
+        const value = style.getPropertyValue(property).replace(/url\(["']?[^)"']*#([^)"']+)["']?\)/g, 'url(#$1)');
+        if (value) copies[index].style.setProperty(property, value);
+      });
+    });
+    clone.removeAttribute('id'); clone.removeAttribute('class');
+    clone.setAttribute('xmlns', NS); clone.setAttribute('width', M.bb.w); clone.setAttribute('height', M.bb.h);
+    const defs = document.querySelector('svg.defs defs'); if (defs) clone.insertBefore(defs.cloneNode(true), clone.firstChild);
+    const background = document.createElementNS(NS, 'rect');
+    for (const [name, value] of Object.entries({ x: M.bb.x, y: M.bb.y, width: M.bb.w, height: M.bb.h, fill: cssVar('--st-bg') })) background.setAttribute(name, value);
+    clone.insertBefore(background, clone.querySelector('g'));
+    const title = document.createElementNS(NS, 'title'); title.textContent = `${M.enzyme} — step ${k + 1}: ${M.steps[k].title}`;
+    const description = document.createElementNS(NS, 'desc'); description.textContent = `${M.steps[k].text} Curated schematic, not a model prediction. Adapted from M-CSA https://www.ebi.ac.uk/thornton-srv/m-csa/entry/${SOURCE_IDS[M.id]}/ under CC BY 4.0 https://creativecommons.org/licenses/by/4.0/. Events and illustration timing are simplified.`;
+    clone.prepend(title, description);
+    const blob = new Blob(['<?xml version="1.0" encoding="UTF-8"?>\n', new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml;charset=utf-8' });
+    const url = URL.createObjectURL(blob), link = document.createElement('a');
+    link.href = url; link.download = `differ-${M.id}-step-${k + 1}.svg`; document.body.appendChild(link); link.click(); link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  setPlayLabel();
+  return {
+    pause,
+    clear() {
+      stop(); M = null; view = null; root.replaceChildren(); tabs.replaceChildren();
+      capTitle.textContent = ''; capText.textContent = ''; capLegend.replaceChildren();
+    },
+    load(mechanism) {
+      stop(); M = mechanism; k = 0; particleTime = 0;
+      if (reduceMotion || motionPaused) playing = false;
+      u = playing ? 0 : .66;
+      view = new MechView(root, M); svgP.setAttribute('viewBox', `${M.bb.x} ${M.bb.y} ${M.bb.w} ${M.bb.h}`);
+      $('#playerKey').innerHTML = keyHTML(M);
+      durations = M.steps.map(step => 5600 + 700 * step.arrows.length + (step.pre ? 1200 : 0));
+      tabs.replaceChildren();
+      M.steps.forEach((step, index) => {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'tab'; button.textContent = `${index + 1} ${step.short}`;
+        button.setAttribute('aria-label', `Step ${index + 1}: ${step.title}`);
+        button.addEventListener('click', () => { k = index; u = playing ? 0 : .66; particleTime = 0; caption(); render(); syncLoop(); });
+        tabs.appendChild(button);
+      });
+      setPlayLabel(); caption(); render(); syncLoop();
+    }
+  };
+})();
+
+
+const zoomDrawing = $('#zoomDrawing'), diagramViewport = $('#diagramViewport');
+zoomDrawing.addEventListener('click', () => {
+  const enlarged = diagramViewport.classList.toggle('zoomed');
+  zoomDrawing.setAttribute('aria-pressed', String(enlarged));
+  zoomDrawing.textContent = enlarged ? 'Fit drawing' : 'Enlarge drawing';
+  $('#diagramHint').textContent = enlarged ? 'Swipe to pan across the drawing' : 'Inspect the chemical details';
+});
+
+syncExampleContext(); updatePreview();
+
+
+})();
+</script>
+</body>
+</html>
