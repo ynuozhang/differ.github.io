@@ -1,13 +1,17 @@
 THIRD-PARTY NOTICES
-Bundled for local hosting. Retrieved 2026-11-12.
+Bundled for local hosting. Manrope retrieved 2026-11-13;
+earlier dependencies retrieved 2026-11-12.
 
-Lora — variable Latin WOFF2, normal and italic, weights 400–700
-Copyright 2011 The Lora Project Authors, with Reserved Font Name "Lora".
-SIL Open Font License 1.1. Full license: fonts/OFL-Lora.txt.
-Project: https://github.com/cyrealtype/Lora-Cyrillic
-Google Fonts metadata: https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&display=swap
-The font binaries are distributed unmodified from Google Fonts.
-Only the Latin subsets are included; other characters use the CSS fallback font.
+Manrope — variable Latin WOFF2, normal, weights 200–800
+Copyright 2018 The Manrope Project Authors (https://github.com/googlefonts/manrope).
+SIL Open Font License 1.1. Full license: fonts/OFL-Manrope.txt.
+Project: https://github.com/googlefonts/manrope
+Google Fonts metadata: https://github.com/google/fonts/blob/main/ofl/manrope/METADATA.pb
+Google Fonts CSS: https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap
+The font binary is distributed unmodified from Google Fonts.
+The official family metadata supplies an upright variable face only;
+no separate italic asset is included. Only the Latin subset is bundled;
+other characters use the CSS fallback font.
 
 SmilesDrawer 2.1.7 — pinned browser distribution
 Copyright (c) 2017 GDB / Reymond Research Group.
@@ -20,20 +24,15 @@ vendor/LICENSE-Chroma-ColorBrewer.txt.
 
 SOURCE FILES AND SHA-256 CHECKSUMS
 
-fonts/lora-latin-normal.woff2
-Source: https://fonts.gstatic.com/s/lora/v37/0QIvMX1D_JOuMwr7Iw.woff2
-Size: 37788 bytes
-SHA-256: ddb8c66035104e233fc024669183aad3738b6daa16deee2ebb1241bd0f98ace1
+fonts/manrope-latin-variable.woff2
+Source: https://fonts.gstatic.com/s/manrope/v23/xn7gYHE41ni1AdIRggexSg.woff2
+Size: 24532 bytes
+SHA-256: 8c2def024c1bf31aacf3624ae3c4d701269b4ec3dc765c04830839f0d36b2d9e
 
-fonts/lora-latin-italic.woff2
-Source: https://fonts.gstatic.com/s/lora/v37/0QIhMX1D_JOuMw_LIftL.woff2
-Size: 40772 bytes
-SHA-256: d824d807d4d832d12c87932d0b8ec1314dcfd502157a56dee6bb04cf8a3768ae
-
-fonts/OFL-Lora.txt
-Source: https://raw.githubusercontent.com/google/fonts/main/ofl/lora/OFL.txt
-Size: 4423 bytes
-SHA-256: 1d9a970809ac804b582a6ce7f0ebc4e7fefcbfd7ff6299cad35ee656a21be716
+fonts/OFL-Manrope.txt
+Source: https://raw.githubusercontent.com/google/fonts/main/ofl/manrope/OFL.txt
+Size: 4387 bytes
+SHA-256: 58172e0c0fac2cda8a37b348164bb55e44b0e69051e557e92b1d3f6910141f7b
 
 vendor/smiles-drawer-2.1.7.min.js
 Source: https://cdn.jsdelivr.net/npm/smiles-drawer@2.1.7/dist/smiles-drawer.min.js
